@@ -1,7 +1,6 @@
 #! /usr/bin/env python
 
 import math
-import collections
 
 # element atomic weights
 elem_mw = dict( [ 
@@ -50,14 +49,353 @@ def split_str(seq, length):
     return [seq[i : i + length] for i in range(0, len(seq), length)]
 
 
-def read_mech(filename, elem_list, spec_list, ):
+class ReacInfo:
+    """Class for reaction information"""
+    
+    def __init__(self, rev, reactants, reac_nu, products, prod_nu, A, b, E):
+        self.reac = reactants
+        self.reac_nu = reac_nu
+        self.prod = products
+        self.prod_nu = prod_nu
+        
+        # Arrhenius coefficients
+        self.A = A
+        self.b = b
+        self.E = E
+        
+        # reversible reaction properties
+        self.rev = rev
+        self.rev_par = [] # reverse A, b, E
+        
+        # duplicate reaction
+        self.dup = False
+        
+        # third-body efficiencies
+        self.thd = False
+        self.thd_body = [] # in pairs with species and efficiency
+        
+        # pressure dependence
+        self.pdep = False
+        self.pdep_sp = ''
+        self.low = []
+        self.high = []
+        
+        self.troe = False
+        self.troe_par = []
+        
+        self.sri = False
+        self.sri_par = []
+
+
+def read_mech(filename, elems, specs, reacs):
     """Read and interpret mechanism file for elements, species, and reactions.
+    
+    Doesn't support element names with digits.
     
     Input
     filename:  reaction mechanism filename (e.g. 'mech.dat'
     """
     
     file = open(filename, 'r')
+    
+    num_e = 0
+    num_s = 0
+    num_r = 0
+    
+    key = ''
+    
+    # start line reading loop
+    while True:
+        line = file.readline()
+        
+        # end of file
+        if line == '': break
+        
+        # skip blank or commented lines
+        if line == '\n' or line == '\r\n' or line[0:1] == '!': continue
+        
+        # convert to lowercase
+        line = line.lower()
+        
+        # remove any comments from end of line
+        ind = line.find('!')
+        if ind > 0: line = line[0:ind]
+        
+        # now determine key
+        if line[0:4] == 'elem':
+            key = 'elem'
+            
+            # check for any entries on this line
+            line_split = line.split()
+            if len(line_split) > 1:
+                ind = line.index( line_split[1] )
+                line = line[ind:]
+            else:
+                continue
+            
+        elif line[0:4] == 'spec':
+            key = 'spec'
+            
+            # check for any entries on this line
+            line_split = line.split()
+            if len(line_split) > 1:
+                ind = line.index( line_split[1] )
+                line = line[ind:]
+            else:
+                continue
+            
+        elif line[0:4] == 'reac':
+            key = 'reac'
+            continue
+            
+        elif line[0:3] == 'end':
+            continue
+        
+        line = line.strip()
+        
+        if key == 'elem':
+            # if any atomic weight declarations, replace / with spaces
+            line = line.replace('/', ' ')
+            
+            line_split = line.split()
+            e_last = ''
+            for e in line_split:
+                if e.isalpha():
+                    if e[0:3] == 'end': continue
+                    if e not in elems:
+                        elems.append(e)
+                        num_e += 1
+                    e_last = e
+                else:
+                    # check either new element or updating existing atomic weight
+                    elem_mw[e_last] = float(e)
+            
+        elif key == 'spec':
+            line_split = line.split()
+            for s in line_split:
+                if s[0:3] == 'end': continue
+                if s not in specs:
+                    specs.append(s)
+                    num_s += 1
+            
+        elif key == 'reac':
+            # determine if reaction or auxiliary info line
+            
+            if '=' in line:
+                # new reaction
+                num_r += 1
+                
+                # get Arrhenius coefficients
+                line_split = line.split()
+                n = len(line_split)
+                reac_A = float( line_split[n - 3] )
+                reac_b = float( line_split[n - 2] )
+                reac_E = float( line_split[n - 1] )
+                
+                ind = line.index( line_split[n - 3] )
+                line = line[0:ind].strip()
+                
+                if '<=>' in line:
+                    ind = line.index('<=>')
+                    reac_rev = True
+                    reac_str = line[0:ind].strip()
+                    prod_str = line[ind + 3:].strip()
+                elif '=>' in line:
+                    ind = line.index('=>')
+                    reac_rev = False
+                    reac_str = line[0:ind].strip()
+                    prod_str = line[ind + 2:].strip()
+                else:
+                    ind = line.index('=')
+                    reac_rev = True
+                    reac_str = line[0:ind].strip()
+                    prod_str = line[ind + 1:].strip()
+                
+                thd = False
+                pdep = False
+                pdep_sp = ''
+                
+                reac_spec = []
+                reac_nu = []
+                prod_spec = []
+                prod_nu = []
+                
+                # reactants
+                
+                # look for third-body species
+                if '(' in reac_str: 
+                    pdep = True
+                    ind1 = reac_str.find('(')
+                    ind2 = reac_str.find(')')
+                    
+                    # either 'm' or a specific species
+                    pdep_sp = reac_str[ind1 + 1 : ind2].replace('+', ' ')
+                    pdep_sp = pdep_sp.strip()
+                    
+                    # now remove from string
+                    reac_str = reac_str[0:ind1] + reac_str[ind2 + 1:]
+                
+                reac_list = reac_str.split('+')
+                
+                for sp in reac_list:
+                    
+                    # look for coefficient
+                    if sp[0:1].isdigit(): 
+                        # starts with number (coefficient)
+                        
+                        # search for first letter
+                        for i in range( len(sp) ):
+                            if sp[i : i + 1].isalpha(): break
+                        
+                        nu = sp[0:i]
+                        if '.' in nu:
+                            # float
+                            nu = float(nu)
+                        else:
+                            # integer
+                            nu = int(nu)
+                        
+                        sp = sp[i:].strip()
+                    else:
+                        # no coefficient given
+                        nu = 1
+                    
+                    # check for third body
+                    if sp == 'm':
+                        thd = True
+                        continue
+                    
+                    # check if species already in reaction
+                    if sp not in reac_spec:
+                        # new reactant
+                        reac_spec.append(sp)
+                        reac_nu.append(nu)
+                    else:
+                        # existing reactant
+                        i = reac_spec.index(sp)
+                        reac_nu[i] += nu
+                
+                # products
+                
+                # look for third-body species
+                if '(' in prod_str: 
+                    pdep = True
+                    ind1 = prod_str.find('(')
+                    ind2 = prod_str.find(')')
+                    
+                    # either 'm' or a specific species
+                    pdep_sp = prod_str[ind1 + 1 : ind2].replace('+', ' ')
+                    pdep_sp = pdep_sp.strip()
+                    
+                    # now remove from string
+                    prod_str = prod_str[0:ind1] + prod_str[ind2 + 1:]
+                
+                prod_list = prod_str.split('+')
+                
+                for sp in prod_list:
+                    
+                    # look for coefficient
+                    if sp[0:1].isdigit(): 
+                        # starts with number (coefficient)
+                        
+                        # search for first letter
+                        for i in range( len(sp) ):
+                            if sp[i : i + 1].isalpha(): break
+                        
+                        nu = sp[0:i]
+                        if '.' in nu:
+                            # float
+                            nu = float(nu)
+                        else:
+                            # integer
+                            nu = int(nu)
+                        
+                        sp = sp[i:].strip()
+                    else:
+                        # no coefficient given
+                        nu = 1
+                    
+                    # check for third body
+                    if sp == 'm':
+                        thd = True
+                        continue
+                    
+                    # check if species already in reaction
+                    if sp not in prod_spec:
+                        # new product
+                        prod_spec.append(sp)
+                        prod_nu.append(nu)
+                    else:
+                        # existing product
+                        i = prod_spec.index(sp)
+                        prod_nu[i] += nu
+                
+                # add reaction to list
+                reacs.append( ReacInfo(reac_rev, reac_spec, reac_nu, prod_spec, prod_nu, reac_A, reac_b, reac_E) )
+                reacs[num_r - 1].thd = thd
+                reacs[num_r - 1].pdep = pdep
+                if pdep: reacs[num_r - 1].pdep_sp = pdep_sp
+                
+            else:
+                # auxiliary reaction info
+                
+                if line[0:3] == 'dup':
+                    reacs[num_r - 1].dup = True
+                    
+                elif line[0:3] == 'rev':
+                    line = line.replace('/', ' ')
+                    line_split = line.split()
+                    reacs[num_r - 1].rev_par.append( float( line_split[1] ) )
+                    reacs[num_r - 1].rev_par.append( float( line_split[2] ) )
+                    reacs[num_r - 1].rev_par.append( float( line_split[3] ) )
+                    
+                elif line[0:3] == 'low':
+                    line = line.replace('/', ' ')
+                    line_split = line.split()
+                    reacs[num_r - 1].low.append( float( line_split[1] ) )
+                    reacs[num_r - 1].low.append( float( line_split[2] ) )
+                    reacs[num_r - 1].low.append( float( line_split[3] ) )
+                    
+                elif line[0:3] == 'hig':
+                    line = line.replace('/', ' ')
+                    line_split = line.split()
+                    reacs[num_r - 1].high.append( float( line_split[1] ) )
+                    reacs[num_r - 1].high.append( float( line_split[2] ) )
+                    reacs[num_r - 1].high.append( float( line_split[3] ) )
+                    
+                elif line[0:3] == 'tro':
+                    line = line.replace('/', ' ')
+                    line_split = line.split()
+                    reacs[num_r - 1].troe = True
+                    reacs[num_r - 1].troe_par.append( float( line_split[1] ) )
+                    reacs[num_r - 1].troe_par.append( float( line_split[2] ) )
+                    reacs[num_r - 1].troe_par.append( float( line_split[3] ) )
+                    
+                    # optional fourth parameter
+                    if len(line_split) > 4:
+                        reacs[num_r - 1].troe_par.append( float( line_split[4] ) )
+                    
+                elif line[0:3] == 'sri':
+                    line = line.replace('/', ' ')
+                    line_split = line.split()
+                    reacs[num_r - 1].sri = True
+                    reacs[num_r - 1].sri_par.append( float( line_split[1] ) )
+                    reacs[num_r - 1].sri_par.append( float( line_split[2] ) )
+                    reacs[num_r - 1].sri_par.append( float( line_split[3] ) )
+                    
+                    # optional fourth and fifth parameters
+                    if len(line_split) > 4:
+                        reacs[num_r - 1].sri_par.append( float( line_split[4] ) )
+                        reacs[num_r - 1].sri_par.append( float( line_split[5] ) )
+                else:
+                    # enhanced third body efficiencies
+                    line = line.replace('/', ' ')
+                    
+                    #print line
+                    
+                    line_split = line.split()
+                    for i in range(0, len(line_split), 2):
+                        reacs[num_r - 1].thd_body.append( [line_split[i], float(line_split[i + 1])] )
     
     return (num_e, num_s, num_r)
 
@@ -88,7 +426,7 @@ def read_thermo(filename, elem_list, spec_list, spec_elem, spec_mw, spec_hi, spe
         line = file.readline()
     
         # skip blank or commented lines
-        if line == '\n' or line[0:1] == '!': continue
+        if line == '\n' or line == '\r\n' or line[0:1] == '!': continue
     
         # skip 'thermo' at beginning
         if line[0:6].lower() == 'thermo': break
@@ -104,8 +442,10 @@ def read_thermo(filename, elem_list, spec_list, spec_elem, spec_mw, spec_hi, spe
         line = file.readline()
         
         # break if end of file
-        if line[0:3].lower() == 'end': break
         if line is None: break
+        if line[0:3].lower() == 'end': break
+        # skip blank/commented line
+        if line == '\n' or line == '\r\n' or line[0:1] == '!': continue
         
         # species name, columns 0:18
         spec = line[0:18].strip()
@@ -274,16 +614,17 @@ def convert_mech_irrev(mech_name, therm_name):
     
     """
     
-    elem_list = []
-    spec_list = []
+    elems = []
+    specs = []
+    reacs = []
     
     # interpret reaction mechanism file
-    #[num_e, num_s, num_r] = read_mech(mech_name, elem_list, spec_list)
+    #[num_e, num_s, num_r] = read_mech(mech_name, elems, specs, reacs)
     
-    elem_list = ['h', 'c', 'o', 'n', 'ar']
-    spec_list = ['h', 'h2', 'o', 'o2', 'oh', 'h2o', 'n2', 'ho2', 'h2o2', 'ar']
-    num_e = len(elem_list)
-    num_s = len(spec_list)
+    elems = ['h', 'c', 'o', 'n', 'ar']
+    specs = ['h', 'h2', 'o', 'o2', 'oh', 'h2o', 'n2', 'ho2', 'h2o2', 'ar']
+    num_e = len(elems)
+    num_s = len(specs)
     therm_name = 'therm.dat'
     
     # initialize empty lists for element numbers, thermo coefficients, temperature ranges
@@ -293,7 +634,7 @@ def convert_mech_irrev(mech_name, therm_name):
     spec_lo = [ [0.0 for j in range(7)] for i in range(num_s) ]
     
     # interpret thermodynamic database file
-    read_thermo(therm_name, elem_list, spec_list, spec_elem, spec_mw, spec_hi, spec_lo)
+    read_thermo(therm_name, elems, specs, specs, spec_mw, spec_hi, spec_lo)
     
     return
 
