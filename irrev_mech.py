@@ -37,6 +37,9 @@ elem_mw = dict( [
     ('bk', 249.00000), ('cf', 251.00000), ('es', 254.00000), ('fm', 253.00000),
     ('d',    2.01410), ('e', 5.48578e-4) ] )
 
+# dict for any new element definitions
+elem_mw_new = dict()
+
 def read_str_num(string):
     """Pull list of floats from a string"""
         
@@ -197,7 +200,11 @@ def read_mech(filename, elems, specs, reacs):
                     e_last = e
                 else:
                     # check either new element or updating existing atomic weight
-                    elem_mw[e_last] = float(e)
+                    if e_last in elem_mw:
+                        elem_mw[e_last] = float(e)
+                    else:
+                        # new element definition
+                        elem_mw_new[e_last] = float(e)
             
         elif key == 'spec':
             line_split = line.split()
