@@ -129,6 +129,7 @@ def read_mech(filename, elems, specs, reacs):
     num_s = 0
     num_r = 0
     
+    units = ''
     key = ''
     
     # start line reading loop
@@ -136,7 +137,7 @@ def read_mech(filename, elems, specs, reacs):
         line = file.readline()
         
         # end of file
-        if line == '': break
+        if not line: break
         
         # skip blank or commented lines
         if line == '\n' or line == '\r\n' or line[0:1] == '!': continue
@@ -178,6 +179,10 @@ def read_mech(filename, elems, specs, reacs):
             line_split = line.split()
             if len(line_split) > 1:
                 units = line[ line.index(line_split[1]) : ].strip()
+            else:
+                # default units
+                units = 'cal/mole'
+            
             continue
             
         elif line[0:3] == 'end':
@@ -202,15 +207,15 @@ def read_mech(filename, elems, specs, reacs):
                     # check either new element or updating existing atomic weight
                     if e_last in elem_mw:
                         elem_mw[e_last] = float(e)
-                    else:
-                        # new element definition
-                        elem_mw_new[e_last] = float(e)
+                    
+                    # in both cases add to 2nd dict to keep track
+                    elem_mw_new[e_last] = float(e)
             
         elif key == 'spec':
             line_split = line.split()
             for s in line_split:
                 if s[0:3] == 'end': continue
-                if len( [sp for sp in specs if sp == s] ):
+                if not next((sp for sp in specs if sp.name == s), None):
                     specs.append( SpecInfo(s) )
                     num_s += 1
             
@@ -433,7 +438,7 @@ def read_mech(filename, elems, specs, reacs):
                     for i in range(0, len(line_split), 2):
                         reacs[num_r - 1].thd_body.append( [line_split[i], float(line_split[i + 1])] )
     
-    return (num_e, num_s, num_r)
+    return (num_e, num_s, num_r, units)
 
 
 def read_thermo(filename, elems, specs):
@@ -447,8 +452,6 @@ def read_thermo(filename, elems, specs):
     elems: list of element names
     specs: list of species names (SpecInfo class)
     """
-    # make local copy of species list
-    species = list(specs)
     
     # lines in thermo file are 80 characters long
     file = open(filename, 'r')
@@ -488,17 +491,17 @@ def read_thermo(filename, elems, specs):
             spec = spec[0 : spec.find(' ')]
         
         # now need to determine if this species is in mechanism
-        spec_match = [specs.index(x) for x in species if x.name == spec]
-        
-        # if not, read next three lines and continue
-        if spec_match == []:
+        if next((sp for sp in specs if sp.name == spec), None):
+            sp_ind = next(i for i in xrange(len(specs)) if specs[i].name == spec)
+        else:
+            # not in mechanism, read next three lines and continue
             line = file.readline()
             line = file.readline()
             line = file.readline()
             continue
         
         # set species to the one matched
-        spec = species[ spec_match[0] ]
+        spec = specs[sp_ind]
         
         # now get element composition of species, columns 24:44
         # each piece of data is 5 characters long (2 for element, 3 for #)
@@ -550,91 +553,44 @@ def read_thermo(filename, elems, specs):
         spec.lo[5] = float( coeffs[2] )
         spec.lo[6] = float( coeffs[3] )
         
-        # remove processed species from list
-        species.remove(spec)
-        
-        # leave loop if all species in mechanism accounted for
-        if species == []: break
+        # stop reading if all species in mechanism accounted for
+        if not next((sp for sp in specs if sp.mw == 0.0), None): break
     
     file.close()
     return
 
 
-def calc_spec_enthalpy(T, specs):
-    """Calculate species standard-state molar enthalpy
-    
-    Given species thermodynamic coefficients and species-specific temperature
-    ranges (if given), calculate standard-state molar enthalpy for all species
+def calc_spec_smh(T, specs):
+    """Calculate standard-state entropies minus enthalpies for all species
     
     Input
     T: temperature
     specs: list of species (SpecInfo class)
     """
     
-    spec_enthalpy = []
+    spec_smh = []
     
+    Tlog = math.log(T)
     T2 = T * T
     T3 = T2 * T
     T4 = T3 * T
-    T5 = T4 * T
-    
-    T2 = T2 / 2.0
-    T3 = T3 / 3.0
-    T4 = T4 / 4.0
-    T5 = T5 / 5.0
-    
-    for spec in specs:
-        if T <= spec.Trange[1]:
-            h =  spec.lo[0] * T  + spec.lo[1] * T2 + spec.lo[2] * T3 + \
-                 spec.lo[3] * T4 + spec.lo[4] * T5 + spec.lo[5]
-            h = h * Ru / spec.mw
-            
+
+    Thalf = T / 2.0
+    T2 = T2 / 6.0
+    T3 = T3 / 12.0
+    T4 = T4 / 20.0
+
+    for sp in specs:
+        if T <= sp.Trange[1]:
+            smh = sp.lo[0] * (Tlog - 1.0) + sp.lo[1] * Thalf + sp.lo[2] * T2 + \
+                  sp.lo[3] * T3 + sp.lo[4] * T4 - (sp.lo[5] / T) + sp.lo[6]
         else:
-            h =  spec.hi[0] * T  + spec.hi[1] * T2 + spec.hi[2] * T3 + \
-                 spec.hi[3] * T4 + spec.hi[4] * T5 + spec.hi[5]
-            h = h * Ru / spec_mw[i]
+            smh = sp.hi[0] * (Tlog - 1.0) + sp.hi[1] * Thalf + sp.hi[2] * T2 + \
+                  sp.hi[3] * T3 + sp.hi[4] * T4 - (sp.hi[5] / T) + sp.hi[6]
         
-        spec_enthalpy.append(h)
+        spec_smh.append(smh)
     
-    return spec_enthalpy
-
-
-def calc_spec_entropy(T, specs):
-    """Calculate species standard-state molar entropy
-    
-    Given species thermodynamic coefficients and species-specific temperature
-    ranges (if given), calculate standard-state molar entropy for all species
-    
-    Input
-    T: temperature
-    specs: list of species (SpecInfo class)
-    """
-    
-    spec_entropy = []
-    
-    Tl = math.log(T)
-    T2 = T * T
-    T3 = T2 * T
-    T4 = T3 * T
-
-    T2 = T2 / 2.0
-    T3 = T3 / 3.0
-    T4 = T4 / 4.0
-
-    for spec in specs:
-        if T <= spec.Trange[1]:
-            s =  spec.lo[0] * Tl + spec.lo[1] * T  + spec.lo[2] * T2 + \
-                 spec.lo[3] * T3 + spec.lo[4] * T4 + spec.lo[6]
-            s = s * Ru / spec_mw[i]
-
-        else:
-            s =  spec.hi[0] * Tl + spec.hi[1] * T  + spec.hi[2] * T2 + \
-                 spec.hi[3] * T3 + spec.hi[4] * T4 + spec.hi[6]
-            s = s * Ru / spec.mw
-
-        spec_entropy.append(s)
-    
-    return spec_entropy
+    return(spec_smh)
 
 
 def calc_rev_Arrhenius(specs, reac, Tfit, units):
@@ -648,7 +604,7 @@ def calc_rev_Arrhenius(specs, reac, Tfit, units):
     Tfit: tuple of three temperatures
     """
     
-    if reac.rev == False or reac.rev_par == []: return
+    if not reac.rev or reac.rev_par: return
     
     # various constants for ease of calculation
     T1 = Tfit[0]
@@ -690,18 +646,20 @@ def calc_rev_Arrhenius(specs, reac, Tfit, units):
     k1 = A * math.exp(b * x1 - (E / T1))
     
     # equilibrium constant
-    spec_enthalpy = calc_spec_enthalpy(T1, specs)
-    spec_entropy = calc_spec_entropy(T1, specs)
+    # first get entropy minus enthalpy for all species
+    spec_smh = calc_spec_smh(T1, specs)
     
     Kp = 0.0
     # products
     for sp in reac.prod:
-        isp = [specs.index(x) for x in specs if x.name == sp][0]
-        Kp += reac.prod_nu[reac.prod.index(sp)] * (spec_entropy[isp] - spec_enthalpy[isp])
+        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
+        Kp += reac.prod_nu[reac.prod.index(sp)] * spec_smh[isp]
+    
     # reactants
     for sp in reac.reac:
-        isp = [specs.index(x) for x in specs if x.name == sp][0]
-        Kp -= reac.reac_nu[reac.reac.index(sp)] * (spec_entropy[isp] - spec_enthalpy[isp])
+        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
+        Kp -= reac.reac_nu[reac.reac.index(sp)] * spec_smh[isp]
+    
     Kp = math.exp(Kp)
     Kc = Kp * (PA / (RU * T1)) ** (sum(reac.prod_nu) - sum(reac.reac_nu))
     kr1 = k1 / Kc
@@ -713,18 +671,18 @@ def calc_rev_Arrhenius(specs, reac, Tfit, units):
     k2 = A * math.exp(b * x2 - (E / T2))
     
     # equilibrium constant
-    spec_enthalpy = calc_spec_enthalpy(T2, specs)
-    spec_entropy = calc_spec_entropy(T2, specs)
+    # first get entropy minus enthalpy for all species
+    spec_smh = calc_spec_smh(T2, specs)
     
     Kp = 0.0
     # products
     for sp in reac.prod:
         isp = [specs.index(x) for x in specs if x.name == sp][0]
-        Kp += reac.prod_nu[reac.prod.index(sp)] * (spec_entropy[isp] - spec_enthalpy[isp])
+        Kp += reac.prod_nu[reac.prod.index(sp)] * spec_smh[isp]
     # reactants
     for sp in reac.reac:
         isp = [specs.index(x) for x in specs if x.name == sp][0]
-        Kp -= reac.reac_nu[reac.reac.index(sp)] * (spec_entropy[isp] - spec_enthalpy[isp])
+        Kp -= reac.reac_nu[reac.reac.index(sp)] * spec_smh[isp]
     Kp = math.exp(Kp)
     Kc = Kp * (PA / (RU * T2)) ** (sum(reac.prod_nu) - sum(reac.reac_nu))
     kr2 = k2 / Kc
@@ -736,18 +694,18 @@ def calc_rev_Arrhenius(specs, reac, Tfit, units):
     k3 = A * math.exp(b * x1 - (E / T3))
     
     # equilibrium constant
-    spec_enthalpy = calc_spec_enthalpy(T3, specs)
-    spec_entropy = calc_spec_entropy(T3, specs)
+    # first get entropy minus enthalpy for all species
+    spec_smh = calc_spec_smh(T3, specs)
     
     Kp = 0.0
     # products
     for sp in reac.prod:
-        isp = [specs.index(x) for x in specs if x.name == sp][0]
-        Kp += reac.prod_nu[reac.prod.index(sp)] * (spec_entropy[isp] - spec_enthalpy[isp])
+        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
+        Kp += reac.prod_nu[reac.prod.index(sp)] * spec_smh[isp]
     # reactants
     for sp in reac.reac:
-        isp = [specs.index(x) for x in specs if x.name == sp][0]
-        Kp -= reac.reac_nu[reac.reac.index(sp)] * (spec_entropy[isp] - spec_enthalpy[isp])
+        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
+        Kp -= reac.reac_nu[reac.reac.index(sp)] * spec_smh[isp]
     Kp = math.exp(Kp)
     Kc = Kp * (PA / (RU * T3)) ** (sum(reac.prod_nu) - sum(reac.reac_nu))
     kr3 = k3 / Kc
@@ -786,6 +744,147 @@ def calc_rev_Arrhenius(specs, reac, Tfit, units):
     return
 
 
+def write_mech(filename, elems, specs, reacs, units):
+    """Write Chemkin-format mechanism.
+    
+    Input
+    """
+    file = open(filename, 'w')
+    
+    # elements
+    file.write('elements\n')
+    
+    for e in elems:
+        # write atomic weight if necessary
+        if e in elem_mw_new:
+            file.write(e + ' /' + str(elem_mw_new[e]) + '/ \n')
+        else:
+            file.write(e + '\n')
+    
+    file.write('end\n\n')
+    
+    # species
+    file.write('species\n')
+    
+    for sp in specs:
+        file.write(sp.name + '\n')
+    
+    file.write('end\n\n')
+    
+    # reactions
+    file.write('reactions                           ' + units + '\n')
+    
+    for rxn in reacs:
+        line = ''
+        
+        # reactants
+        for sp in rxn.reac:
+            isp = rxn.reac.index(sp)
+            # print stoich coefficient if other than one
+            if rxn.reac_nu[isp] != 1:
+                line += str(rxn.reac_nu[isp]) + ' ' + sp
+            else:
+                line += sp
+            
+            if (len(rxn.reac) - 1) > isp:
+                line += ' + '
+        
+        # third body in reactants
+        if rxn.thd:
+            line += ' + m'
+        elif rxn.pdep:
+            line += ' + ({:s})'.format(rxn.pdep_sp)
+        
+        if rxn.rev:
+            line += ' = '
+        else:
+            line += ' => '
+        
+        # products
+        for sp in rxn.prod:
+            isp = rxn.prod.index(sp)
+            # print stoich coefficient if other than one
+            if rxn.prod_nu[isp] != 1:
+                line += str(rxn.prod_nu[isp]) + ' ' + sp
+            else:
+                line += sp
+            
+            if (len(rxn.prod) - 1) > isp:
+                line += ' + '
+        
+        # third body in products
+        if rxn.thd:
+            line += ' + m'
+        elif rxn.pdep:
+            line += ' + ({:s})'.format(rxn.pdep_sp)
+        
+        # now add Arrhenius coefficients to the same line
+        line += '    {:e}  {:.3f}  {:e}'.format(rxn.A, rxn.b, rxn.E)
+        
+        line += '\n'
+        file.write(line)
+        
+        
+        # line for reverse Arrhenius parameters, if any
+        if rxn.rev:
+            line = '    rev /  {:e}  {:.3f}  {:e}  / \n'.format(rxn.rev_par[0], rxn.rev_par[1], rxn.rev_par[2])
+            file.write(line)
+        
+        
+        # write Lindemann low- or high-pressure limit Arrhenius parameters
+        if rxn.pdep:
+            if rxn.low:
+                line = '    low / {:e}  {:.3f}  {:e} / \n'.format(rxn.low[0], rxn.low[1], rxn.low[2])
+            else:
+                line = '    high / {:e}  {:.3f}  {:e} / \n'.format(rxn.high[0], rxn.high[1], rxn.high[2])
+            
+            file.write(line)
+        
+        # write Troe parameters if any
+        if rxn.troe:
+            troe = rxn.troe_par
+            if len(troe) == 3:
+                line = '    troe / {:.4e} {:.4e} {:.4e} / \n'.format(troe[0], troe[1], troe[2])
+            else:
+                line = '    troe / {:.4e} {:.4e} {:.4e} {:.4e} / \n'.format(troe[0], troe[1], troe[2], troe[3])
+            file.write(line)
+        
+        
+        # write SRI parameters if any
+        if rxn.sri:
+            sri = rxn.sri_par
+            if len(sri) == 3:
+                line = '    sri / {:.4e} {:.4e} {:.4e} / \n'.format(sri[0], sri[1], sri[2])
+            else:
+                line = '    sri / {:.4e} {:.4e} {:.4e} {:.4e} {:.4e} / \n'.format(sri[0], sri[1], sri[2], sri[3], sri[4])
+        
+        
+        # third-body efficiencies
+        if rxn.thd_body:
+            line = '    '
+            for thd_body in rxn.thd_body:
+                thd_eff = '{:.2f}'.format(thd_body[1])
+                line += thd_body[0] + ' / ' + thd_eff + ' / '
+                
+                # move to next line if long
+                if len(line) >= 60:
+                    line += '\n'
+                    file.write(line)
+                    line = '    '
+            
+            line += '\n'
+            file.write(line)
+        
+        # duplicate reaction flag
+        if rxn.dup:
+            file.write('    DUPLICATE\n')
+    
+    file.write('end')
+    
+    file.close()
+    return
+
+
 def convert_mech_irrev(mech_name, therm_name):
     """Convert Chemkin-style mechanism with reversible reactions.
     
@@ -799,10 +898,9 @@ def convert_mech_irrev(mech_name, therm_name):
     elems = []
     specs = []
     reacs = []
-    units = ''
     
     # interpret reaction mechanism file
-    [num_e, num_s, num_r] = read_mech(mech_name, elems, specs, reacs, units)
+    [num_e, num_s, num_r, units] = read_mech(mech_name, elems, specs, reacs)
     
     # interpret thermodynamic database file
     read_thermo(therm_name, elems, specs)
@@ -811,25 +909,35 @@ def convert_mech_irrev(mech_name, therm_name):
     Tfit = 1000.0, 1750.0, 2500.0
     
     # now loop through reversible reactions
-    for reac in [reac for reac in reacs[:] if reac.rev == True]:
+    for rxn in [rxn for rxn in reacs[:] if rxn.rev]:
         
         # reaction doesn't have explicit reverse Arrhenius parameters, so calculate
-        if reac.rev_par == []: calc_rev_Arrhenius(specs, reac, Tfit, units)
+        if not rxn.rev_par: calc_rev_Arrhenius(specs, rxn, Tfit, units)
         
-        # now create 2 irreversible reactions
-        reac.rev = False
-        irrev_reac = copy.deepcopy(reac)
-        irrev_reac.A = irrev_reac.rev_par[0]
-        irrev_reac.b = irrev_reac.rev_par[1]
-        irrev_reac.E = irrev_reac.rev_par[2]
-        reac.rev_par = []
-        irrev_reac.rev_par = []
+        # now create 2 irreversible reactions from reversible
+        rxn.rev = False
+        irrev_rxn = copy.deepcopy(rxn)
+        
+        # switch reactants and products
+        irrev_rxn.reac = copy.copy(rxn.prod)
+        irrev_rxn.reac_nu = copy.copy(rxn.prod_nu)
+        irrev_rxn.prod = copy.copy(rxn.reac)
+        irrev_rxn.prod_nu = copy.copy(rxn.reac_nu)
+        
+        
+        irrev_rxn.A = irrev_rxn.rev_par[0]
+        irrev_rxn.b = irrev_rxn.rev_par[1]
+        irrev_rxn.E = irrev_rxn.rev_par[2]
+        rxn.rev_par = []
+        irrev_rxn.rev_par = []
         
         # now insert into reaction list
-        reacs.insert(reacs.index(reac) + 1, irrev_reac)
+        reacs.insert(reacs.index(rxn) + 1, irrev_rxn)
+    
+    mod_mech = 'mech_irrev.dat'
     
     # write new reaction list to new file
-    write_mech(elems, specs, reacs)
+    write_mech(mod_mech, elems, specs, reacs, units)
     
     return
 
