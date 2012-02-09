@@ -793,7 +793,7 @@ def write_mech(filename, elems, specs, reacs, units):
         if rxn.thd:
             line += ' + m'
         elif rxn.pdep:
-            line += ' + ({:s})'.format(rxn.pdep_sp)
+            line += ' (+ {:s})'.format(rxn.pdep_sp)
         
         if rxn.rev:
             line += ' = '
@@ -816,7 +816,7 @@ def write_mech(filename, elems, specs, reacs, units):
         if rxn.thd:
             line += ' + m'
         elif rxn.pdep:
-            line += ' + ({:s})'.format(rxn.pdep_sp)
+            line += ' (+ {:s})'.format(rxn.pdep_sp)
         
         # now add Arrhenius coefficients to the same line
         line += '    {:e}  {:.3f}  {:e}'.format(rxn.A, rxn.b, rxn.E)
@@ -924,6 +924,10 @@ def convert_mech_irrev(mech_name, therm_name):
         irrev_rxn.prod = copy.copy(rxn.reac)
         irrev_rxn.prod_nu = copy.copy(rxn.reac_nu)
         
+        # switch high/low pressure limit if any
+        if irrev_rxn.pdep:
+            irrev_rxn.low = copy.copy(rxn.high)
+            irrev_rxn.high = copy.copy(rxn.low)
         
         irrev_rxn.A = irrev_rxn.rev_par[0]
         irrev_rxn.b = irrev_rxn.rev_par[1]
