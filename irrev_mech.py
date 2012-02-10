@@ -917,77 +917,29 @@ def convert_mech_irrev(mech_name, therm_name):
         irrev_rxn.prod = copy.copy(rxn.reac)
         irrev_rxn.prod_nu = copy.copy(rxn.reac_nu)
         
+        # reaction doesn't have explicit reverse Arrhenius parameters, so calculate
+        if not rxn.rev_par:
+            coeffs = [rxn.A, rxn.b, rxn.E]
+            rev_par = calc_rev_Arrhenius(specs, rxn, Tfit, units, coeffs)
+        
+        irrev_rxn.A = rev_par[0]
+        irrev_rxn.b = rev_par[1]
+        irrev_rxn.E = rev_par[2]
+        
         # get reverse high-/low-pressure limit coeffs
         if rxn.pdep:
             
-            # check if forward direction is unimolecular or bimolecular
-            if sum(rxn.reac_nu) > sum(rxn.prod_nu):
-                # bimolecular
-                
-                # if reaction has low pressure coeffs, switch
-                if rxn.low:
-                    rxn.high.append(rxn.A)
-                    rxn.high.append(rxn.b)
-                    rxn.high.append(rxn.E)
-                    rxn.A = rxn.low[0]
-                    rxn.b = rxn.low[1]
-                    rxn.E = rxn.low[2]
-                    rxn.low = []
-                
-                # get reverse coefficients
-                coeffs = [rxn.A, rxn.b, rxn.E]
-                rev_par = calc_rev_Arrhenius(specs, rxn, Tfit, units, coeffs)
-                irrev_rxn.low = copy.copy(rev_par)
-                
-                coeffs = rxn.high
-                rev_par = calc_rev_Arrhenius(specs, rxn, Tfit, units, coeffs)
-                irrev_rxn.A = rev_par[0]
-                irrev_rxn.b = rev_par[1]
-                irrev_rxn.E = rev_par[2]
-                
-            else:
-                # unimolecular
-                
-                # if reaction has high pressure coeffs, switch
-                if rxn.high:
-                    rxn.low.append(rxn.A)
-                    rxn.low.append(rxn.b)
-                    rxn.low.append(rxn.E)
-                    rxn.A = rxn.high[0]
-                    rxn.b = rxn.high[1]
-                    rxn.E = rxn.high[2]
-                    rxn.high = []
-                
-                # get reverse coefficients
-                coeffs = [rxn.A, rxn.b, rxn.E]
-                rev_par = calc_rev_Arrhenius(specs, rxn, Tfit, units, coeffs)
-                
-                irrev_rxn.high = copy.copy(rev_par)
-                
+            if rxn.low:
                 coeffs = rxn.low
-                rev_par = calc_rev_Arrhenius(specs, rxn, Tfit, units, coeffs)
-                irrev_rxn.A = rev_par[0]
-                irrev_rxn.b = rev_par[1]
-                irrev_rxn.E = rev_par[2]
+            elif rxn.high:
+                coeffs = rxn.high
             
-            # calculate reverse of high or low pressure coefficients
             rev_par = calc_rev_Arrhenius(specs, rxn, Tfit, units, coeffs)
             
-            # get reverse coefficients
-            coeffs = [rxn.A, rxn.b, rxn.E]
-            rev_par = calc_rev_Arrhenius(specs, rxn, Tfit, units, coeffs)
-            
-        else:
-            # no pressure dependence, just switch
-            
-            # reaction doesn't have explicit reverse Arrhenius parameters, so calculate
-            if not rxn.rev_par:
-                coeffs = [rxn.A, rxn.b, rxn.E]
-                rev_par = calc_rev_Arrhenius(specs, rxn, Tfit, units, coeffs)
-            
-            irrev_rxn.A = rev_par[0]
-            irrev_rxn.b = rev_par[1]
-            irrev_rxn.E = rev_par[2]
+            if rxn.low:
+                irrev_rxn.low = copy.copy(rev_par)
+            elif rxn.high:
+                irrev_rxn.high = copy.copy(rev_par)
         
         rxn.rev_par = []
         irrev_rxn.rev_par = []
