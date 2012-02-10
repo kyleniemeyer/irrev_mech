@@ -135,6 +135,9 @@ def read_mech(filename, elems, specs, reacs):
     
     # start line reading loop
     while True:
+        # remember last line position
+        last_line = file.tell()
+        
         line = file.readline()
         
         # end of file
@@ -186,7 +189,15 @@ def read_mech(filename, elems, specs, reacs):
                 units = 'cal/mole'
             
             continue
+        elif line[0:4].lower() == 'therm':
+            # thermo data is in mechanism file
             
+            # rewind a line
+            file.seek(last_line)
+            
+            read_thermo(file, elems, specs)
+            
+            continue
         elif line[0:3].lower() == 'end':
             continue
         
@@ -446,20 +457,17 @@ def read_mech(filename, elems, specs, reacs):
     return (num_e, num_s, num_r, units)
 
 
-def read_thermo(filename, elems, specs):
+def read_thermo(file, elems, specs):
     """Read and interpret thermodynamic database for species data.
     
     Reads the file therm.dat and returns the species thermodynamic coefficients
     as well as the species-specific temperature range values (if given)
     
     Input
-    filename:  thermo database filename (e.g. 'therm.dat')
+    file:  pointer to open thermo database file
     elems: list of element names
     specs: list of species names (SpecInfo class)
     """
-    
-    # lines in thermo file are 80 characters long
-    file = open(filename, 'r')
     
     # loop through intro lines
     while True:
@@ -471,10 +479,18 @@ def read_thermo(filename, elems, specs):
         # skip 'thermo' at beginning
         if line[0:6].lower() == 'thermo': break
     
-    # next line has common temperature ranges
+    # next line either has common temperature ranges or first species
+    last_line = file.tell()
     line = file.readline()
     
-    T_ranges = read_str_num(line)
+    line_split = line.split()
+    if line_split[0][0:1].isdigit():
+        T_ranges = read_str_num(line)
+    else:
+        # no common temperature info
+        file.seek(last_line)
+        # default
+        Tranges = [300.0, 1000.0, 5000,0]
     
     # now start reading species thermo info
     while True:
@@ -566,7 +582,6 @@ def read_thermo(filename, elems, specs):
         # stop reading if all species in mechanism accounted for
         if not next((sp for sp in specs if sp.mw == 0.0), None): break
     
-    file.close()
     return
 
 
@@ -884,10 +899,12 @@ def write_mech(filename, elems, specs, reacs, units):
     return
 
 
-def convert_mech_irrev(mech_name, therm_name):
+def convert_mech_irrev(mech_name, therm_name = None):
     """Convert Chemkin-style mechanism with reversible reactions.
     
-    
+    Input
+    mech_name: string with reaction mechanism filename (e.g. 'mech.dat')
+    therm_name: string with thermodynamic database filename (e.g. 'therm.dat') or nothing if info in mech_name
     """
     import copy
     
@@ -898,8 +915,11 @@ def convert_mech_irrev(mech_name, therm_name):
     # interpret reaction mechanism file
     [num_e, num_s, num_r, units] = read_mech(mech_name, elems, specs, reacs)
     
-    # interpret thermodynamic database file
-    read_thermo(therm_name, elems, specs)
+    # interpret thermodynamic database file (if it exists)
+    if therm_name:
+        file = open(therm_name, 'r')
+        read_thermo(file, elems, specs)
+        file.close()
     
     # tuple holding fit temperatures
     Tfit = 1000.0, 1750.0, 2500.0
@@ -957,4 +977,10 @@ def convert_mech_irrev(mech_name, therm_name):
 
 if __name__ == "__main__":
     import sys
-    convert_mech_irrev(sys.argv[1], sys.argv[2])
+    
+    if len(sys.argv) == 2:
+        convert_mech_irrev(sys.argv[1])
+    elif len(sys.argv) == 3:
+        convert_mech_irrev(sys.argv[1], sys.argv[2])
+    else:
+        print 'Incorrect number of arguments'
