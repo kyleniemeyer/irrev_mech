@@ -20,6 +20,8 @@ You can also run `irrev_mech` without a thermodynamic database if the informatio
 
     $ python irrev_mech.py mech.dat
 
+The new mechanism has the name `mech_irrev.txt`.
+
 The default temperatures used for parameter fitting are 1000 K, 1750 K, and 2500 K. These can be changed by modifying the `Tfit` variable in `convert_mech_irrev()`.
 
 Misc

@@ -967,7 +967,7 @@ def convert_mech_irrev(mech_name, therm_name = None):
         # now insert into reaction list
         reacs.insert(reacs.index(rxn) + 1, irrev_rxn)
     
-    mod_mech = 'mech_irrev.dat'
+    mod_mech = 'mech_irrev.txt'
     
     # write new reaction list to new file
     write_mech(mod_mech, elems, specs, reacs, units)
