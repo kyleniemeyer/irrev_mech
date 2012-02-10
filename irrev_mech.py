@@ -5,6 +5,7 @@ import math
 # universal gas constants, cgs units
 RU = 8.314510e7 # erg/(mole * K)
 RUC = 1.9858775 # cal/(mole * K)
+RU_JOUL = 8.314510e0
 # pressure of one standard atmosphere, dynes/cm^2
 PA = 1.01325e6
 
@@ -280,6 +281,8 @@ def read_mech(filename, elems, specs, reacs):
                 
                 for sp in reac_list:
                     
+                    sp = sp.strip()
+                    
                     # look for coefficient
                     if sp[0:1].isdigit(): 
                         # starts with number (coefficient)
@@ -334,6 +337,8 @@ def read_mech(filename, elems, specs, reacs):
                 prod_list = prod_str.split('+')
                 
                 for sp in prod_list:
+                    
+                    sp = sp.strip()
                     
                     # look for coefficient
                     if sp[0:1].isdigit(): 
@@ -476,9 +481,11 @@ def read_thermo(filename, elems, specs):
         # first line of species info
         line = file.readline()
         
+        line = line.lower()
+        
         # break if end of file
         if line is None: break
-        if line[0:3].lower() == 'end': break
+        if line[0:3] == 'end': break
         # skip blank/commented line
         if line == '\n' or line == '\r\n' or line[0:1] == '!': continue
         
@@ -511,7 +518,9 @@ def read_thermo(filename, elems, specs):
             e = e_str[0:2].strip()
             # skip if blank
             if e == '': continue
-            e_num = int( e_str[2:].strip() )
+            # may need to convert to float first, in case of e.g. "1."
+            e_num = float( e_str[2:].strip() )
+            e_num = int(e_num)
             
             spec.elem.append([e, e_num])
             
@@ -619,22 +628,27 @@ def calc_rev_Arrhenius(specs, reac, Tfit, units):
     x3 = math.log(T3)
     
     # use correct gas constant based on units
-    if 'kcal/mole' in units:
-        E = reac.E * 1000.0 / RUC
-    elif 'cal/mole' in units:
-        E = reac.E / RUC
-    elif 'joules/mole' in units:
-        # Ru = 8.3144621 J/(mol * K)
-        E = reac.E / 8.3144621
-    elif 'evolts' in units:
-        # Ru = 5.189e19 eV/(mol * K)
-        E = reac.E / 5.189e19
-    elif 'kelvins' in units:
-        # no division by Ru needed
-        E = reac.E
-    else:
-        # default is cal/mole
-        E = reac.E / RUC
+    efac = 1.0
+    if 'kelvin' not in units:
+        if 'kcal/mole' in units:
+            #E = reac.E * 1000.0 / RUC
+            efac = 4184.0 / RU_JOUL
+        elif 'cal/mole' in units:
+            #E = reac.E / RUC
+            efac = 4.184 / RU_JOUL
+        elif 'kjoule' in units:
+            efac = 1000.0 / RU_JOUL
+        elif 'joules' in units:
+            # Ru = 8.3144621 J/(mol * K)
+            #E = reac.E / 8.3144621
+            efac = 1.00 / RU_JOUL
+        elif 'evolt' in units:
+            # Ru = 5.189e19 eV/(mol * K)
+            efac = 11595.
+        else:
+            # default is cal/mole
+            efac = 4.184 / RU_JOUL
+    E = reac.E * efac
     
     
     # calculate reverse reaction rates for each temperature
@@ -677,12 +691,14 @@ def calc_rev_Arrhenius(specs, reac, Tfit, units):
     Kp = 0.0
     # products
     for sp in reac.prod:
-        isp = [specs.index(x) for x in specs if x.name == sp][0]
+        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
         Kp += reac.prod_nu[reac.prod.index(sp)] * spec_smh[isp]
+    
     # reactants
     for sp in reac.reac:
-        isp = [specs.index(x) for x in specs if x.name == sp][0]
+        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
         Kp -= reac.reac_nu[reac.reac.index(sp)] * spec_smh[isp]
+    
     Kp = math.exp(Kp)
     Kc = Kp * (PA / (RU * T2)) ** (sum(reac.prod_nu) - sum(reac.reac_nu))
     kr2 = k2 / Kc
@@ -691,7 +707,7 @@ def calc_rev_Arrhenius(specs, reac, Tfit, units):
     
     # calculate forward reaction rate (ignoring pressure dependence, since it
     # is accounted for in both directions by the specific formulation
-    k3 = A * math.exp(b * x1 - (E / T3))
+    k3 = A * math.exp(b * x3 - (E / T3))
     
     # equilibrium constant
     # first get entropy minus enthalpy for all species
@@ -702,10 +718,12 @@ def calc_rev_Arrhenius(specs, reac, Tfit, units):
     for sp in reac.prod:
         isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
         Kp += reac.prod_nu[reac.prod.index(sp)] * spec_smh[isp]
+    
     # reactants
     for sp in reac.reac:
         isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
         Kp -= reac.reac_nu[reac.reac.index(sp)] * spec_smh[isp]
+    
     Kp = math.exp(Kp)
     Kc = Kp * (PA / (RU * T3)) ** (sum(reac.prod_nu) - sum(reac.reac_nu))
     kr3 = k3 / Kc
@@ -720,23 +738,8 @@ def calc_rev_Arrhenius(specs, reac, Tfit, units):
     Ar = (a1 * T1 * (x2 * T2 - x3 * T3) + a2 * T2 * (x3 * T3 - x1 * T1) + a3 * T3 * (x1 * T1 - x2 * T2)) / den
     Ar = math.exp(Ar)
     
-    # use correct gas constant based on units
-    if 'kcal/mole' in units:
-        Er = Er * RUC / 1000.0
-    elif 'cal/mole' in units:
-        Er = Er * RUC
-    elif 'joules/mole' in units:
-        # Ru = 8.3144621 J/(mol * K)
-        Er = Er * 8.3144621
-    elif 'evolts' in units:
-        # Ru = 5.189e19 eV/(mol * K)
-        Er = Er * 5.189e19
-    elif 'kelvins' in units:
-        # no division by Ru needed
-        Er = Er
-    else:
-        # default is cal/mole
-        Er = Er * RUC
+    # correct gas constant based on units
+    Er /= efac
     
     reac.rev_par.append(Ar)
     reac.rev_par.append(br)
@@ -819,7 +822,7 @@ def write_mech(filename, elems, specs, reacs, units):
             line += ' (+ {:s})'.format(rxn.pdep_sp)
         
         # now add Arrhenius coefficients to the same line
-        line += '    {:e}  {:.3f}  {:e}'.format(rxn.A, rxn.b, rxn.E)
+        line += '    {:.4e}  {:.4e}  {:.4e}'.format(rxn.A, rxn.b, rxn.E)
         
         line += '\n'
         file.write(line)
@@ -827,16 +830,16 @@ def write_mech(filename, elems, specs, reacs, units):
         
         # line for reverse Arrhenius parameters, if any
         if rxn.rev:
-            line = '    rev /  {:e}  {:.3f}  {:e}  / \n'.format(rxn.rev_par[0], rxn.rev_par[1], rxn.rev_par[2])
+            line = '    rev /  {:.4e}  {:.4e}  {:.4e}  / \n'.format(rxn.rev_par[0], rxn.rev_par[1], rxn.rev_par[2])
             file.write(line)
         
         
         # write Lindemann low- or high-pressure limit Arrhenius parameters
         if rxn.pdep:
             if rxn.low:
-                line = '    low / {:e}  {:.3f}  {:e} / \n'.format(rxn.low[0], rxn.low[1], rxn.low[2])
+                line = '    low / {:.4e}  {:.4e}  {:.4e} / \n'.format(rxn.low[0], rxn.low[1], rxn.low[2])
             else:
-                line = '    high / {:e}  {:.3f}  {:e} / \n'.format(rxn.high[0], rxn.high[1], rxn.high[2])
+                line = '    high / {:.4e}  {:.4e}  {:.4e} / \n'.format(rxn.high[0], rxn.high[1], rxn.high[2])
             
             file.write(line)
         
@@ -891,9 +894,6 @@ def convert_mech_irrev(mech_name, therm_name):
     
     """
     import copy
-    
-    mech_name = 'mech.dat'
-    therm_name = 'therm.dat'
     
     elems = []
     specs = []
