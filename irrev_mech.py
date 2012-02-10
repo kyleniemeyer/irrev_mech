@@ -143,15 +143,16 @@ def read_mech(filename, elems, specs, reacs):
         # skip blank or commented lines
         if line == '\n' or line == '\r\n' or line[0:1] == '!': continue
         
-        # convert to lowercase
-        line = line.lower()
+        # don't convert everything, since thermo needs to match (for Chemkin)
+        ## convert to lowercase
+        #line = line.lower()
         
         # remove any comments from end of line
         ind = line.find('!')
         if ind > 0: line = line[0:ind]
         
         # now determine key
-        if line[0:4] == 'elem':
+        if line[0:4].lower() == 'elem':
             key = 'elem'
             
             # check for any entries on this line
@@ -162,7 +163,7 @@ def read_mech(filename, elems, specs, reacs):
             else:
                 continue
             
-        elif line[0:4] == 'spec':
+        elif line[0:4].lower() == 'spec':
             key = 'spec'
             
             # check for any entries on this line
@@ -173,7 +174,7 @@ def read_mech(filename, elems, specs, reacs):
             else:
                 continue
             
-        elif line[0:4] == 'reac':
+        elif line[0:4].lower() == 'reac':
             key = 'reac'
             
             # get Arrhenius coefficient units
@@ -186,7 +187,7 @@ def read_mech(filename, elems, specs, reacs):
             
             continue
             
-        elif line[0:3] == 'end':
+        elif line[0:3].lower() == 'end':
             continue
         
         line = line.strip()
@@ -207,10 +208,10 @@ def read_mech(filename, elems, specs, reacs):
                 else:
                     # check either new element or updating existing atomic weight
                     if e_last in elem_mw:
-                        elem_mw[e_last] = float(e)
+                        elem_mw[e_last.lower()] = float(e)
                     
                     # in both cases add to 2nd dict to keep track
-                    elem_mw_new[e_last] = float(e)
+                    elem_mw_new[e_last.lower()] = float(e)
             
         elif key == 'spec':
             line_split = line.split()
@@ -305,7 +306,7 @@ def read_mech(filename, elems, specs, reacs):
                         nu = 1
                     
                     # check for third body
-                    if sp == 'm':
+                    if sp == 'm' or sp == 'M':
                         thd = True
                         continue
                     
@@ -362,7 +363,7 @@ def read_mech(filename, elems, specs, reacs):
                         nu = 1
                     
                     # check for third body
-                    if sp == 'm':
+                    if sp == 'm' or sp == 'M':
                         thd = True
                         continue
                     
@@ -385,31 +386,32 @@ def read_mech(filename, elems, specs, reacs):
             else:
                 # auxiliary reaction info
                 
-                if line[0:3] == 'dup':
+                aux = line[0:3].lower()
+                if aux == 'dup':
                     reacs[num_r - 1].dup = True
                     
-                elif line[0:3] == 'rev':
+                elif aux == 'rev':
                     line = line.replace('/', ' ')
                     line_split = line.split()
                     reacs[num_r - 1].rev_par.append( float( line_split[1] ) )
                     reacs[num_r - 1].rev_par.append( float( line_split[2] ) )
                     reacs[num_r - 1].rev_par.append( float( line_split[3] ) )
                     
-                elif line[0:3] == 'low':
+                elif aux == 'low':
                     line = line.replace('/', ' ')
                     line_split = line.split()
                     reacs[num_r - 1].low.append( float( line_split[1] ) )
                     reacs[num_r - 1].low.append( float( line_split[2] ) )
                     reacs[num_r - 1].low.append( float( line_split[3] ) )
                     
-                elif line[0:3] == 'hig':
+                elif aux == 'hig':
                     line = line.replace('/', ' ')
                     line_split = line.split()
                     reacs[num_r - 1].high.append( float( line_split[1] ) )
                     reacs[num_r - 1].high.append( float( line_split[2] ) )
                     reacs[num_r - 1].high.append( float( line_split[3] ) )
                     
-                elif line[0:3] == 'tro':
+                elif aux == 'tro':
                     line = line.replace('/', ' ')
                     line_split = line.split()
                     reacs[num_r - 1].troe = True
@@ -421,7 +423,7 @@ def read_mech(filename, elems, specs, reacs):
                     if len(line_split) > 4:
                         reacs[num_r - 1].troe_par.append( float( line_split[4] ) )
                     
-                elif line[0:3] == 'sri':
+                elif aux == 'sri':
                     line = line.replace('/', ' ')
                     line_split = line.split()
                     reacs[num_r - 1].sri = True
@@ -436,8 +438,6 @@ def read_mech(filename, elems, specs, reacs):
                 else:
                     # enhanced third body efficiencies
                     line = line.replace('/', ' ')
-                    
-                    #print line
                     
                     line_split = line.split()
                     for i in range(0, len(line_split), 2):
@@ -481,7 +481,8 @@ def read_thermo(filename, elems, specs):
         # first line of species info
         line = file.readline()
         
-        line = line.lower()
+        # don't convert to lowercase, needs to match thermo for Chemkin
+        #line = line.lower()
         
         # break if end of file
         if line is None: break
@@ -525,7 +526,7 @@ def read_thermo(filename, elems, specs):
             spec.elem.append([e, e_num])
             
             # calculate molecular weight
-            spec.mw += e_num * elem_mw[e]
+            spec.mw += e_num * elem_mw[e.lower()]
         
         # temperatures for species
         T_spec = read_str_num(line[45:73])
@@ -755,7 +756,7 @@ def write_mech(filename, elems, specs, reacs, units):
     for e in elems:
         # write atomic weight if necessary
         if e in elem_mw_new:
-            file.write(e + ' /' + str(elem_mw_new[e]) + '/ \n')
+            file.write(e + ' /' + str(elem_mw_new[e.lower()]) + '/ \n')
         else:
             file.write(e + '\n')
     
