@@ -1,4 +1,4 @@
-from chem_utilties import *
+from chem_utilities import *
 
 def read_mech(filename, elems, specs, reacs):
     """Read and interpret mechanism file for elements, species, and reactions.
