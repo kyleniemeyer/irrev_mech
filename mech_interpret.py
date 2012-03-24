@@ -74,7 +74,7 @@ def read_mech(filename, elems, specs, reacs):
                 units = 'cal/mole'
             
             continue
-        elif line[0:4].lower() == 'therm':
+        elif line[0:4].lower() == 'ther':
             # thermo data is in mechanism file
             
             # rewind a line
