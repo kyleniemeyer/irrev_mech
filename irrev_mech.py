@@ -190,10 +190,13 @@ def write_mech(filename, elems, specs, reacs, units):
                 line += ' + '
         
         # third body in reactants
-        if rxn.thd:
+        if rxn.pdep:
+            if rxn.thd:
+                line += ' (+ m)'
+            else:
+                line += ' (+ {:s})'.format(rxn.pdep_sp)
+        elif rxn.thd:
             line += ' + m'
-        elif rxn.pdep:
-            line += ' (+ {:s})'.format(rxn.pdep_sp)
         
         if rxn.rev:
             line += ' = '
@@ -213,10 +216,13 @@ def write_mech(filename, elems, specs, reacs, units):
                 line += ' + '
         
         # third body in products
-        if rxn.thd:
+        if rxn.pdep:
+            if rxn.thd:
+                line += ' (+ m)'
+            else:
+                line += ' (+ {:s})'.format(rxn.pdep_sp)
+        elif rxn.thd:
             line += ' + m'
-        elif rxn.pdep:
-            line += ' (+ {:s})'.format(rxn.pdep_sp)
         
         # now add Arrhenius coefficients to the same line
         line += '    {:.4e}  {:.4e}  {:.4e}'.format(rxn.A, rxn.b, rxn.E)
