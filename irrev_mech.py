@@ -306,6 +306,23 @@ def convert_mech_irrev(mech_name, therm_name = None):
         file = open(therm_name, 'r')
         read_thermo(file, elems, specs)
         file.close()
+    else:
+        # copy therm data into new file
+        mech_file = open(mech_name, 'r')
+        file = open('therm_irrev.txt', 'w')
+        
+        flag = False
+        for line in mech_file:
+            if line[0:4].lower() == 'ther':
+                file.write('thermo\n')
+                flag = True
+                continue
+            
+            if flag: file.write(line)
+            
+            if flag and line[0:3].lower() == 'end': break
+        
+        file.close()
     
     # tuple holding fit temperatures
     Tfit = 1000.0, 1750.0, 2500.0
