@@ -33,3 +33,8 @@ License
 -------
 
 `irrev_mech` is released under the modified BSD license, see LICENSE for details.
+
+Author
+------
+
+Created by [Kyle Niemeyer](http://kyleniemeyer.com). Email address: [kyle.niemeyer@gmail.com](mailto:kyle.niemeyer@gmail.com)
