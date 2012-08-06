@@ -27,7 +27,7 @@ The default temperatures used for parameter fitting are 1000 K, 1750 K, and 2500
 Misc
 -------
 
-The most up-to-date version of `irrev_mech` can be found at the [GitHub repository][https://github.com/kyleniemeyer/irrev_mech] on GitHub.
+The most up-to-date version of `irrev_mech` can be found at the [GitHub repository](https://github.com/kyleniemeyer/irrev_mech) on GitHub.
 
 License
 -------
