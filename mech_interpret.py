@@ -383,7 +383,7 @@ def read_thermo(file, elems, specs):
         # no common temperature info
         file.seek(last_line)
         # default
-        Tranges = [300.0, 1000.0, 5000,0]
+        T_ranges = [300.0, 1000.0, 5000,0]
     
     # now start reading species thermo info
     while True:
@@ -442,7 +442,7 @@ def read_thermo(file, elems, specs):
         T_low  = T_spec[0]
         T_high = T_spec[1]
         if len(T_spec) == 3: T_com = T_spec[2]
-        else: T_com = T_common[1]
+        else: T_com = T_ranges[1]
         
         spec.Trange = [T_low, T_com, T_high]
         
