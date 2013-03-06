@@ -339,7 +339,7 @@ def convert_mech_irrev(mech_name, therm_name = None):
         # create 2 irreversible reactions from reversible
         rxn.rev = False
         irrev_rxn = copy.deepcopy(rxn)
-    
+        
         # switch reactants and products
         irrev_rxn.reac = copy.copy(rxn.prod)
         irrev_rxn.reac_nu = copy.copy(rxn.prod_nu)
