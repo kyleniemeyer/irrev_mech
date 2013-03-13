@@ -182,50 +182,50 @@ def write_mech(filename, elems, specs, reacs, units):
             isp = rxn.reac.index(sp)
             # print stoich coefficient if other than one
             if rxn.reac_nu[isp] != 1:
-                line += str(rxn.reac_nu[isp]) + ' ' + sp
+                line += str(rxn.reac_nu[isp]) + sp
             else:
                 line += sp
             
             if (len(rxn.reac) - 1) > isp:
-                line += ' + '
+                line += '+'
         
         # third body in reactants
         if rxn.pdep:
             if rxn.thd:
-                line += ' (+ m)'
+                line += '(+m)'
             else:
-                line += ' (+ {:s})'.format(rxn.pdep_sp)
+                line += '(+{:s})'.format(rxn.pdep_sp)
         elif rxn.thd:
-            line += ' + m'
+            line += '+m'
         
         if rxn.rev:
-            line += ' = '
+            line += '='
         else:
-            line += ' => '
+            line += '=>'
         
         # products
         for sp in rxn.prod:
             isp = rxn.prod.index(sp)
             # print stoich coefficient if other than one
             if rxn.prod_nu[isp] != 1:
-                line += str(rxn.prod_nu[isp]) + ' ' + sp
+                line += str(rxn.prod_nu[isp]) + sp
             else:
                 line += sp
             
             if (len(rxn.prod) - 1) > isp:
-                line += ' + '
+                line += '+'
         
         # third body in products
         if rxn.pdep:
             if rxn.thd:
-                line += ' (+ m)'
+                line += '(+m)'
             else:
-                line += ' (+ {:s})'.format(rxn.pdep_sp)
+                line += '(+{:s})'.format(rxn.pdep_sp)
         elif rxn.thd:
-            line += ' + m'
+            line += '+m'
         
         # now add Arrhenius coefficients to the same line
-        line += '    {:.4e}  {:.4e}  {:.4e}'.format(rxn.A, rxn.b, rxn.E)
+        line += ' {:.4e} {:.4e} {:.4e}'.format(rxn.A, rxn.b, rxn.E)
         
         line += '\n'
         file.write(line)
@@ -233,16 +233,16 @@ def write_mech(filename, elems, specs, reacs, units):
         
         # line for reverse Arrhenius parameters, if any
         if rxn.rev:
-            line = '    rev /  {:.4e}  {:.4e}  {:.4e}  / \n'.format(rxn.rev_par[0], rxn.rev_par[1], rxn.rev_par[2])
+            line = '  rev/ {:.4e}  {:.4e}  {:.4e} /\n'.format(rxn.rev_par[0], rxn.rev_par[1], rxn.rev_par[2])
             file.write(line)
         
         
         # write Lindemann low- or high-pressure limit Arrhenius parameters
         if rxn.pdep:
             if rxn.low:
-                line = '    low / {:.4e}  {:.4e}  {:.4e} / \n'.format(rxn.low[0], rxn.low[1], rxn.low[2])
+                line = '  low /{:.4e}  {:.4e}  {:.4e} /\n'.format(rxn.low[0], rxn.low[1], rxn.low[2])
             else:
-                line = '    high / {:.4e}  {:.4e}  {:.4e} / \n'.format(rxn.high[0], rxn.high[1], rxn.high[2])
+                line = '  high /{:.4e}  {:.4e}  {:.4e} /\n'.format(rxn.high[0], rxn.high[1], rxn.high[2])
             
             file.write(line)
         
@@ -250,9 +250,9 @@ def write_mech(filename, elems, specs, reacs, units):
         if rxn.troe:
             troe = rxn.troe_par
             if len(troe) == 3:
-                line = '    troe / {:.4e} {:.4e} {:.4e} / \n'.format(troe[0], troe[1], troe[2])
+                line = '  troe/ {:.4e} {:.4e} {:.4e} /\n'.format(troe[0], troe[1], troe[2])
             else:
-                line = '    troe / {:.4e} {:.4e} {:.4e} {:.4e} / \n'.format(troe[0], troe[1], troe[2], troe[3])
+                line = '  troe/ {:.4e} {:.4e} {:.4e} {:.4e} /\n'.format(troe[0], troe[1], troe[2], troe[3])
             file.write(line)
         
         
@@ -260,30 +260,30 @@ def write_mech(filename, elems, specs, reacs, units):
         if rxn.sri:
             sri = rxn.sri_par
             if len(sri) == 3:
-                line = '    sri / {:.4e} {:.4e} {:.4e} / \n'.format(sri[0], sri[1], sri[2])
+                line = '  sri/ {:.4e} {:.4e} {:.4e} /\n'.format(sri[0], sri[1], sri[2])
             else:
-                line = '    sri / {:.4e} {:.4e} {:.4e} {:.4e} {:.4e} / \n'.format(sri[0], sri[1], sri[2], sri[3], sri[4])
+                line = '  sri/ {:.4e} {:.4e} {:.4e} {:.4e} {:.4e} /\n'.format(sri[0], sri[1], sri[2], sri[3], sri[4])
         
         
         # third-body efficiencies
         if rxn.thd_body:
-            line = '    '
+            line = '  '
             for thd_body in rxn.thd_body:
                 thd_eff = '{:.2f}'.format(thd_body[1])
-                line += thd_body[0] + ' / ' + thd_eff + ' / '
+                line += thd_body[0] + '/' + thd_eff + '/ '
                 
                 # move to next line if long
-                if len(line) >= 60:
+                if len(line) >= 60 and rxn.thd_body.index(thd_body) is not (len(rxn.thd_body) - 1):
                     line += '\n'
                     file.write(line)
-                    line = '    '
+                    line = '  '
             
             line += '\n'
             file.write(line)
         
         # duplicate reaction flag
         if rxn.dup:
-            file.write('    DUPLICATE\n')
+            file.write('  DUPLICATE\n')
     
     file.write('end')
     
@@ -350,6 +350,8 @@ def convert_mech_irrev(mech_name, therm_name = None):
         if not rxn.rev_par:
             coeffs = [rxn.A, rxn.b, rxn.E]
             rev_par = calc_rev_Arrhenius(specs, rxn, Tfit, units, coeffs)
+        else:
+            rev_par = rxn.rev_par
         
         irrev_rxn.A = rev_par[0]
         irrev_rxn.b = rev_par[1]
