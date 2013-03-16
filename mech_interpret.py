@@ -493,7 +493,7 @@ def read_thermo(file, elems, specs):
         for e_str in elem_str:
             e = e_str[0:2].strip()
             # skip if blank
-            if e == '': continue
+            if e == '' or e == '0': continue
             # may need to convert to float first, in case of e.g. "1."
             e_num = float( e_str[2:].strip() )
             e_num = int(e_num)
