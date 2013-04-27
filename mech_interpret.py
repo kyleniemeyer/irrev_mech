@@ -84,6 +84,7 @@ def read_mech(filename, elems, specs, reacs):
             
             continue
         elif line[0:3].lower() == 'end':
+            key = ''
             continue
         
         line = line.strip()
@@ -413,7 +414,6 @@ def read_mech(filename, elems, specs, reacs):
                 else:
                     # enhanced third body efficiencies
                     line = line.replace('/', ' ')
-                    
                     line_split = line.split()
                     for i in range(0, len(line_split), 2):
                         reacs[num_r - 1].thd_body.append( [line_split[i], float(line_split[i + 1])] )
