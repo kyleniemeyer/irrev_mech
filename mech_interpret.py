@@ -362,6 +362,7 @@ def read_mech(filename, elems, specs, reacs):
                     
                 elif aux == 'rev':
                     line = line.replace('/', ' ')
+                    line = line.replace(',', ' ')
                     line_split = line.split()
                     reacs[num_r - 1].rev_par.append( float( line_split[1] ) )
                     reacs[num_r - 1].rev_par.append( float( line_split[2] ) )
@@ -369,6 +370,7 @@ def read_mech(filename, elems, specs, reacs):
                     
                 elif aux == 'low':
                     line = line.replace('/', ' ')
+                    line = line.replace(',', ' ')
                     line_split = line.split()
                     reacs[num_r - 1].low.append( float( line_split[1] ) )
                     reacs[num_r - 1].low.append( float( line_split[2] ) )
@@ -376,6 +378,7 @@ def read_mech(filename, elems, specs, reacs):
                     
                 elif aux == 'hig':
                     line = line.replace('/', ' ')
+                    line = line.replace(',', ' ')
                     line_split = line.split()
                     reacs[num_r - 1].high.append( float( line_split[1] ) )
                     reacs[num_r - 1].high.append( float( line_split[2] ) )
@@ -383,6 +386,7 @@ def read_mech(filename, elems, specs, reacs):
                     
                 elif aux == 'tro':
                     line = line.replace('/', ' ')
+                    line = line.replace(',', ' ')
                     line_split = line.split()
                     reacs[num_r - 1].troe = True
                     reacs[num_r - 1].troe_par.append( float( line_split[1] ) )
@@ -395,6 +399,7 @@ def read_mech(filename, elems, specs, reacs):
                     
                 elif aux == 'sri':
                     line = line.replace('/', ' ')
+                    line = line.replace(',', ' ')
                     line_split = line.split()
                     reacs[num_r - 1].sri = True
                     reacs[num_r - 1].sri_par.append( float( line_split[1] ) )
