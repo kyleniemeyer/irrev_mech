@@ -365,9 +365,18 @@ def read_mech(filename, elems, specs, reacs):
                     line = line.replace('/', ' ')
                     line = line.replace(',', ' ')
                     line_split = line.split()
-                    reacs[num_r - 1].rev_par.append( float( line_split[1] ) )
-                    reacs[num_r - 1].rev_par.append( float( line_split[2] ) )
-                    reacs[num_r - 1].rev_par.append( float( line_split[3] ) )
+                    rev_par = []
+                    rev_par.append( float( line_split[1] ) )
+                    rev_par.append( float( line_split[2] ) )
+                    rev_par.append( float( line_split[3] ) )
+                    #reacs[num_r - 1].rev_par.append( float( line_split[1] ) )
+                    #reacs[num_r - 1].rev_par.append( float( line_split[2] ) )
+                    #reacs[num_r - 1].rev_par.append( float( line_split[3] ) )
+                    
+                    if (rev_par == [0.0, 0.0, 0.0]):
+                        reacs[num_r - 1].rev = False
+                    else:
+                        reacs[num_r - 1].rev_par = rev_par
                     
                 elif aux == 'low':
                     line = line.replace('/', ' ')
