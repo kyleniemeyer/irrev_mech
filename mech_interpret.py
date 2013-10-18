@@ -365,18 +365,9 @@ def read_mech(filename, elems, specs, reacs):
                     line = line.replace('/', ' ')
                     line = line.replace(',', ' ')
                     line_split = line.split()
-                    rev_par = []
-                    rev_par.append( float( line_split[1] ) )
-                    rev_par.append( float( line_split[2] ) )
-                    rev_par.append( float( line_split[3] ) )
-                    #reacs[num_r - 1].rev_par.append( float( line_split[1] ) )
-                    #reacs[num_r - 1].rev_par.append( float( line_split[2] ) )
-                    #reacs[num_r - 1].rev_par.append( float( line_split[3] ) )
-                    
-                    if (rev_par == [0.0, 0.0, 0.0]):
-                        reacs[num_r - 1].rev = False
-                    else:
-                        reacs[num_r - 1].rev_par = rev_par
+                    reacs[num_r - 1].rev_par.append( float( line_split[1] ) )
+                    reacs[num_r - 1].rev_par.append( float( line_split[2] ) )
+                    reacs[num_r - 1].rev_par.append( float( line_split[3] ) )
                     
                 elif aux == 'low':
                     line = line.replace('/', ' ')
@@ -499,6 +490,14 @@ def read_thermo(file, elems, specs):
         
         # set species to the one matched
         spec = specs[sp_ind]
+        
+        # ensure not reading the same species more than once...
+        if spec.mw:
+            # already done! skip next three lines
+            line = file.readline()
+            line = file.readline()
+            line = file.readline()
+            continue
         
         # now get element composition of species, columns 24:44
         # each piece of data is 5 characters long (2 for element, 3 for #)
