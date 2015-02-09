@@ -1,11 +1,66 @@
 #! /usr/bin/env python
 
+# Python 2 compatibility
+from __future__ import division
+from __future__ import print_function
+
+# Standard libraries
+import copy
 import math
-from chem_utilities import *
-from mech_interpret import *
+from argparse import ArgumentParser
+import numpy as np
+from scipy.optimize import leastsq
+
+# Local imports
+import chem_utilities as chem
+import mech_interpret as mech
+
+
+def calc_rate_coeff(p, T):
+    """Calculate Arrhenius reaction rate coefficient."""
+    A, b, E = p
+    k = A * np.exp(b * np.log(T) - (E / T))
+    return k
+
+
+def calc_rev_rate_coeff(T, p_Arr, specs, reac):
+    """Calculate reverse Arrhenius rate coefficient."""
+    
+    # calculate forward reaction rate (ignoring pressure dependence, since it
+    # is accounted for in both directions by the specific formulation)
+    k_fwd = calc_rate_coeff(p_Arr, T)
+    
+    # equilibrium constant
+    # first get entropy minus enthalpy for all species
+    spec_smh = chem.calc_spec_smh(T, specs)
+    
+    Kp = 0.0
+    # products
+    for sp in reac.prod:
+        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
+        Kp += reac.prod_nu[reac.prod.index(sp)] * spec_smh[isp]
+    
+    # reactants
+    for sp in reac.reac:
+        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
+        Kp -= reac.reac_nu[reac.reac.index(sp)] * spec_smh[isp]
+    
+    Kp = math.exp(Kp)
+    Kc = Kp * (chem.PA / (chem.RU * T)) ** (sum(reac.prod_nu) - sum(reac.reac_nu))
+    k_rev = k_fwd / Kc
+    
+    return k_rev
+
+
+def residuals(p, y, x):
+    """Residual for calculating rate coefficient."""
+    A, b, E = p
+    err = y - calc_rate_coeff(p, x)
+    return err
+
 
 def calc_rev_Arrhenius(specs, reac, Tfit, units, coeffs):
-    """Calculate reverse Arrhenius coefficients.
+    """Calculate reverse Arrhenius coefficients for a particular reaction.
     
     Using three temperatures, fit reverse Arrhenius coefficients by
     calcluating forward and reverse reaction rates.
@@ -31,102 +86,32 @@ def calc_rev_Arrhenius(specs, reac, Tfit, units, coeffs):
     efac = 1.0
     if 'kelvin' not in units:
         if 'kcal/mole' in units:
-            #E = reac.E * 1000.0 / RUC
-            efac = 4184.0 / RU_JOUL
+            efac = 4184.0 / chem.RU_JOUL
         elif 'cal/mole' in units:
-            #E = reac.E / RUC
-            efac = 4.184 / RU_JOUL
+            efac = 4.184 / chem.RU_JOUL
         elif 'kjoule' in units:
-            efac = 1000.0 / RU_JOUL
+            efac = 1000.0 / chem.RU_JOUL
         elif 'joules' in units:
-            # Ru = 8.3144621 J/(mol * K)
-            #E = reac.E / 8.3144621
-            efac = 1.00 / RU_JOUL
+            efac = 1.00 / chem.RU_JOUL
         elif 'evolt' in units:
-            # Ru = 5.189e19 eV/(mol * K)
-            efac = 11595.
+            efac = 11595.0
         else:
             # default is cal/mole
-            efac = 4.184 / RU_JOUL
+            efac = 4.184 / chem.RU_JOUL
     E = coeffs[2] * efac
     
+    p_Arr = A, b, E
     
     # calculate reverse reaction rates for each temperature
     
     # T1
+    kr1 = calc_rev_rate_coeff(T1, p_Arr, specs, reac)
     
-    # calculate forward reaction rate (ignoring pressure dependence, since it
-    # is accounted for in both directions by the specific formulation
-    k1 = A * math.exp(b * x1 - (E / T1))
-    
-    # equilibrium constant
-    # first get entropy minus enthalpy for all species
-    spec_smh = calc_spec_smh(T1, specs)
-    
-    Kp = 0.0
-    # products
-    for sp in reac.prod:
-        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
-        Kp += reac.prod_nu[reac.prod.index(sp)] * spec_smh[isp]
-    
-    # reactants
-    for sp in reac.reac:
-        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
-        Kp -= reac.reac_nu[reac.reac.index(sp)] * spec_smh[isp]
-    
-    Kp = math.exp(Kp)
-    Kc = Kp * (PA / (RU * T1)) ** (sum(reac.prod_nu) - sum(reac.reac_nu))
-    kr1 = k1 / Kc
-    
-    # T2
-    
-    # calculate forward reaction rate (ignoring pressure dependence, since it
-    # is accounted for in both directions by the specific formulation
-    k2 = A * math.exp(b * x2 - (E / T2))
-    
-    # equilibrium constant
-    # first get entropy minus enthalpy for all species
-    spec_smh = calc_spec_smh(T2, specs)
-    
-    Kp = 0.0
-    # products
-    for sp in reac.prod:
-        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
-        Kp += reac.prod_nu[reac.prod.index(sp)] * spec_smh[isp]
-    
-    # reactants
-    for sp in reac.reac:
-        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
-        Kp -= reac.reac_nu[reac.reac.index(sp)] * spec_smh[isp]
-    
-    Kp = math.exp(Kp)
-    Kc = Kp * (PA / (RU * T2)) ** (sum(reac.prod_nu) - sum(reac.reac_nu))
-    kr2 = k2 / Kc
+    # T2    
+    kr2 = calc_rev_rate_coeff(T2, p_Arr, specs, reac)
     
     # T3
-    
-    # calculate forward reaction rate (ignoring pressure dependence, since it
-    # is accounted for in both directions by the specific formulation
-    k3 = A * math.exp(b * x3 - (E / T3))
-    
-    # equilibrium constant
-    # first get entropy minus enthalpy for all species
-    spec_smh = calc_spec_smh(T3, specs)
-    
-    Kp = 0.0
-    # products
-    for sp in reac.prod:
-        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
-        Kp += reac.prod_nu[reac.prod.index(sp)] * spec_smh[isp]
-    
-    # reactants
-    for sp in reac.reac:
-        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
-        Kp -= reac.reac_nu[reac.reac.index(sp)] * spec_smh[isp]
-    
-    Kp = math.exp(Kp)
-    Kc = Kp * (PA / (RU * T3)) ** (sum(reac.prod_nu) - sum(reac.reac_nu))
-    kr3 = k3 / Kc
+    kr3 = calc_rev_rate_coeff(T3, p_Arr, specs, reac)
     
     a1 = math.log(kr1)
     a2 = math.log(kr2)
@@ -137,6 +122,15 @@ def calc_rev_Arrhenius(specs, reac, Tfit, units, coeffs):
     Er = T1 * T2 * T3 * (a1 * (x2 - x3) + a2 * (x3 - x1) + a3 * (x1 - x2)) / den
     Ar = (a1 * T1 * (x2 * T2 - x3 * T3) + a2 * T2 * (x3 * T3 - x1 * T1) + a3 * T3 * (x1 * T1 - x2 * T2)) / den
     Ar = math.exp(Ar)
+    
+    # Now perform nonlinear least-squares minimization using these 
+    # values as the initial guesses.
+    x = np.linspace(T1, T3, 1000)
+    y = np.zeros(len(x))
+    for idx, val in enumerate(x):
+        y[idx] = calc_rev_rate_coeff(val, p_Arr, specs, reac)
+    
+    vals_lsq = leastsq(residuals, [Ar, br, Er], args=(y, x), maxfev=10000)
     
     # correct gas constant based on units
     Er /= efac
@@ -156,8 +150,8 @@ def write_mech(filename, elems, specs, reacs, units):
     
     for e in elems:
         # write atomic weight if necessary
-        if e in elem_mw_new:
-            file.write(e + ' /' + str(elem_mw_new[e.lower()]) + '/ \n')
+        if e in mech.elem_new:
+            file.write(e + ' /' + str(mech.elem_wt[e.lower()]) + '/ \n')
         else:
             file.write(e + '\n')
     
@@ -298,19 +292,14 @@ def convert_mech_irrev(mech_name, therm_name = None):
     mech_name: string with reaction mechanism filename (e.g. 'mech.dat')
     therm_name: string with thermodynamic database filename (e.g. 'therm.dat') or nothing if info in mech_name
     """
-    import copy
-    
-    elems = []
-    specs = []
-    reacs = []
     
     # interpret reaction mechanism file
-    [num_e, num_s, num_r, units] = read_mech(mech_name, elems, specs, reacs)
+    [elems, specs, reacs, units] = mech.read_mech(mech_name)
     
     # interpret thermodynamic database file (if it exists)
     if therm_name:
         file = open(therm_name, 'r')
-        read_thermo(file, elems, specs)
+        mech.read_thermo(file, elems, specs)
         file.close()
     else:
         # copy therm data into new file
@@ -331,7 +320,7 @@ def convert_mech_irrev(mech_name, therm_name = None):
         file.close()
     
     # tuple holding fit temperatures
-    Tfit = 1000.0, 1750.0, 2500.0
+    Tfit = 300.0, 1000.0, 5000.0
     
     # now loop through reversible reactions
     for rxn in [rxn for rxn in reacs[:] if rxn.rev]:
@@ -387,11 +376,20 @@ def convert_mech_irrev(mech_name, therm_name = None):
 
 
 if __name__ == "__main__":
-    import sys
     
-    if len(sys.argv) == 2:
-        convert_mech_irrev(sys.argv[1])
-    elif len(sys.argv) == 3:
-        convert_mech_irrev(sys.argv[1], sys.argv[2])
-    else:
-        print 'Incorrect number of arguments'
+    # command line arguments
+    parser = ArgumentParser(description = 'Generates reaction mechanism with '
+                                          'only irreversible reactions.')
+    parser.add_argument('-m', '--mech',
+                        type = str,
+                        required = True, 
+                        help = 'Input mechanism filename (e.g., mech.dat).')
+    parser.add_argument('-t', '--thermo',
+                        type = str,
+                        default = None, 
+                        help = 'Thermodynamic database filename (e.g., '
+                        'therm.dat), or nothing if in mechanism.')
+    
+    args = parser.parse_args()
+    convert_mech_irrev(args.mech, args.thermo)
+
