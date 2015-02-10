@@ -285,12 +285,12 @@ def write_mech(filename, elems, specs, reacs, units):
     return
 
 
-def convert_mech_irrev(mech_name, therm_name = None):
+def convert_mech_irrev(mech_name, therm_name, temp_range):
     """Convert Chemkin-style mechanism with reversible reactions.
     
     Input
     mech_name: string with reaction mechanism filename (e.g. 'mech.dat')
-    therm_name: string with thermodynamic database filename (e.g. 'therm.dat') or nothing if info in mech_name
+    therm_name: string with thermodynamic database filename (e.g. 'therm.dat') or None if info in mech_name
     """
     
     # interpret reaction mechanism file
@@ -320,7 +320,9 @@ def convert_mech_irrev(mech_name, therm_name = None):
         file.close()
     
     # tuple holding fit temperatures
-    Tfit = 300.0, 1000.0, 5000.0
+    #Tfit = 300.0, 1000.0, 5000.0
+    Tmid = temp_range[0] + 0.5*(temp_range[1] - temp_range[0])
+    Tfit = temp_range[0], Tmid, temp_range[1]
     
     # now loop through reversible reactions
     for rxn in [rxn for rxn in reacs[:] if rxn.rev]:
@@ -389,7 +391,11 @@ if __name__ == "__main__":
                         default = None, 
                         help = 'Thermodynamic database filename (e.g., '
                         'therm.dat), or nothing if in mechanism.')
+    parser.add_argument('-r', '--range',
+                        type = float, nargs=2,
+                        default = [300.0, 5000.0], 
+                        help = 'Temperature range for fit in Kelvin (e.g., 300 5000).')
     
     args = parser.parse_args()
-    convert_mech_irrev(args.mech, args.thermo)
+    convert_mech_irrev(args.mech, args.thermo, args.range)
 
