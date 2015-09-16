@@ -134,7 +134,7 @@ def calc_rev_Arrhenius(specs, reac, reac_id, Tfit, units, coeffs):
 
     # Start with low number of max function evals, increase if needed.
     warnings.filterwarnings('error')
-    for mx in [1000, 5000, 10000, 20000]:
+    for mx in [1000, 5000, 10000, 20000, 40000]:
         try:
             val_lsq = leastsq(residuals, [Ar, br, Er], args=(y, x), maxfev=mx)
             break
@@ -142,7 +142,7 @@ def calc_rev_Arrhenius(specs, reac, reac_id, Tfit, units, coeffs):
             continue
     else:
         print('Warning: minimization failed to converge for reaction ' +
-              reac_id + '.'
+              str(reac_id) + '.'
               )
 
     # correct gas constant based on units
