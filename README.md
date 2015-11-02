@@ -27,7 +27,7 @@ The default temperature range used for parameter fitting is 300 K to 5000 K. Thi
 Misc
 -------
 
-The most up-to-date version of `irrev_mech` can be found at the [GitHub repository](https://github.com/kyleniemeyer/irrev_mech) on GitHub. 
+The most up-to-date version of `irrev_mech` can be found at the [GitHub repository](https://github.com/kyleniemeyer/irrev_mech) on GitHub.
 
 License
 -------
@@ -36,12 +36,12 @@ License
 
 If you use this software as part of a scholarly publication, please cite the following paper in addition to the GitHub repository:
 
- * KE Niemeyer and CJ Sung. "Accelerating moderately stiff chemical kinetics in reactive-flow simulations using GPUs." *J. Comput. Phys.*, 256:854-871, 2014. doi:[10.1016/j.jcp.2013.09.025](http://dx.doi.org/10.1016/j.jcp.2013.09.025) 
- 
+ * KE Niemeyer and CJ Sung. "Accelerating moderately stiff chemical kinetics in reactive-flow simulations using GPUs." *J. Comput. Phys.*, 256:854-871, 2014. doi:[10.1016/j.jcp.2013.09.025](http://dx.doi.org/10.1016/j.jcp.2013.09.025)
+
 Further Reading
 ---------------
 
-The three reverse Arrehenius coefficients are determined using a nonlinear least-squares minimization, using the [SciPy] function `scipy.optimize.leastsq`. The fit is performed using a large number of calculated reverse rate coefficents, densely sampled over the specified temperature range. The initial guess for this minimization comes from an analytical fit to three temperatures (the high and low values of the range, plus a midpoint). See the appendix of Niemeyer and Sung's paper cited above for more details. The use of the least-squares minimization to obtain better fits was suggested by Taylor et al.:
+The three reverse Arrhenius coefficients are determined using a nonlinear least-squares minimization, using the [SciPy] function `scipy.optimize.leastsq`. The fit is performed using a large number of calculated reverse rate coefficients, densely sampled over the specified temperature range. The initial guess for this minimization comes from an analytical fit to three temperatures (the high and low values of the range, plus a midpoint). See the appendix of Niemeyer and Sung's paper cited above for more details. The use of the least-squares minimization to obtain better fits was suggested by Taylor et al.:
 
  * BD Taylor, DA Schwer, and A Corrigan. "Implementation of Thermochemistry and Chemical Kinetics in a GPU-based CFD Code." 53rd AIAA Aerospace Sciences Meeting, Kissimmee, FL, January 2015. doi:[10.2514/6.2015-0842](http://dx.doi.org/10.2514/6.2015-0842)
 
