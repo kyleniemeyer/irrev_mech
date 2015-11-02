@@ -60,7 +60,7 @@ def residuals(p, y, x):
     return err
 
 
-def calc_rev_Arrhenius(specs, reac, reac_id, Tfit, units, coeffs):
+def calc_rev_Arrhenius(specs, reac, reac_id, Tfit, coeffs):
     """Calculate reverse Arrhenius coefficients for a particular reaction.
 
     Using three temperatures, fit reverse Arrhenius coefficients by
@@ -79,28 +79,11 @@ def calc_rev_Arrhenius(specs, reac, reac_id, Tfit, units, coeffs):
 
     A = coeffs[0]
     b = coeffs[1]
+    E = coeffs[2]
 
     x1 = math.log(T1)
     x2 = math.log(T2)
     x3 = math.log(T3)
-
-    # use correct gas constant based on units
-    efac = 1.0
-    if 'kelvin' not in units:
-        if 'kcal/mole' in units:
-            efac = 4184.0 / chem.RU_JOUL
-        elif 'cal/mole' in units:
-            efac = 4.184 / chem.RU_JOUL
-        elif 'kjoule' in units:
-            efac = 1000.0 / chem.RU_JOUL
-        elif 'joules' in units:
-            efac = 1.00 / chem.RU_JOUL
-        elif 'evolt' in units:
-            efac = 11595.0
-        else:
-            # default is cal/mole
-            efac = 4.184 / chem.RU_JOUL
-    E = coeffs[2] * efac
 
     p_Arr = A, b, E
 
@@ -145,13 +128,10 @@ def calc_rev_Arrhenius(specs, reac, reac_id, Tfit, units, coeffs):
               str(reac_id) + '.'
               )
 
-    # correct gas constant based on units
-    Er /= efac
-
     return [Ar, br, Er]
 
 
-def write_mech(filename, elems, specs, reacs, units):
+def write_mech(filename, elems, specs, reacs):
     """Write Chemkin-format mechanism.
 
     Input
@@ -161,9 +141,12 @@ def write_mech(filename, elems, specs, reacs, units):
     # elements
     file.write('elements\n')
 
+    elem_wt_orig = chem.get_elem_wt()
+    elem_new = set(mech.elem_wt.iteritems()) - set(elem_wt_orig.iteritems())
+    elem_new = dict(elem_new)
     for e in elems:
         # write atomic weight if necessary
-        if e in mech.elem_new:
+        if e in elem_new:
             file.write(e + ' /' + str(mech.elem_wt[e.lower()]) + '/ \n')
         else:
             file.write(e + '\n')
@@ -179,7 +162,7 @@ def write_mech(filename, elems, specs, reacs, units):
     file.write('end\n\n')
 
     # reactions
-    file.write('reactions                           ' + units + '\n')
+    file.write('reactions                           kelvins\n')
 
     for rxn in reacs:
         line = ''
@@ -231,24 +214,51 @@ def write_mech(filename, elems, specs, reacs, units):
         elif rxn.thd:
             line += '+m'
 
+        # Convert internal units to moles
+        reac_ord = sum(rxn.reac_nu)
+        if rxn.thd:
+            rxn.A /= 1000. ** reac_ord
+        elif rxn.pdep:
+            # Low- (chemically activated bimolecular reaction) or
+            # high-pressure (fall-off reaction) limit parameters
+            rxn.A /= 1000. ** (reac_ord - 1.)
+        else:
+            # Elementary reaction
+            rxn.A /= 1000. ** (reac_ord - 1.)
+
         # now add Arrhenius coefficients to the same line
         line += ' {:.4e} {:.4e} {:.4e}'.format(rxn.A, rxn.b, rxn.E)
 
         line += '\n'
         file.write(line)
 
-
         # line for reverse Arrhenius parameters, if any
         if rxn.rev:
-            line = '  rev/ {:.4e}  {:.4e}  {:.4e} /\n'.format(rxn.rev_par[0], rxn.rev_par[1], rxn.rev_par[2])
-            file.write(line)
+            # Convert internal units to moles
+            reac_ord = sum(rxn.prod_nu)
+            if rxn.thd:
+                rxn.rev_par[0] /= 1000. ** reac_ord
+            elif rxn.pdep:
+                # Low- (chemically activated bimolecular reaction) or
+                # high-pressure (fall-off reaction) limit parameters
+                rxn.rev_par[0] /= 1000. ** (reac_ord - 1.)
+            else:
+                # Elementary reaction
+                rxn.rev_par[0] /= 1000. ** (reac_ord - 1.)
 
+            line = '  rev/ {:.4e}  {:.4e}  {:.4e} /\n'.format(rxn.rev_par[0],
+                                                              rxn.rev_par[1],
+                                                              rxn.rev_par[2]
+                                                              )
+            file.write(line)
 
         # write Lindemann low- or high-pressure limit Arrhenius parameters
         if rxn.pdep:
             if rxn.low:
+                rxn.low[0] /= 1000. ** sum(rxn.reac_nu)
                 line = '  low /{:.4e}  {:.4e}  {:.4e} /\n'.format(rxn.low[0], rxn.low[1], rxn.low[2])
             else:
+                rxn.low[0] /= 1000. ** (sum(rxn.reac_nu) - 2.)
                 line = '  high /{:.4e}  {:.4e}  {:.4e} /\n'.format(rxn.high[0], rxn.high[1], rxn.high[2])
 
             file.write(line)
@@ -300,7 +310,7 @@ def write_mech(filename, elems, specs, reacs, units):
     return
 
 
-def convert_mech_irrev(mech_name, therm_name, temp_range):
+def convert_mech_irrev(mech_name, therm_name=None, temp_range=[300.,5000.]):
     """Convert Chemkin-style mechanism with reversible reactions.
 
     Input
@@ -310,7 +320,7 @@ def convert_mech_irrev(mech_name, therm_name, temp_range):
     """
 
     # interpret reaction mechanism file
-    [elems, specs, reacs] = mech.read_mech(mech_name)
+    [elems, specs, reacs] = mech.read_mech(mech_name, therm_name)
 
     # tuple holding fit temperatures
     #Tfit = 300.0, 1000.0, 5000.0
@@ -334,7 +344,7 @@ def convert_mech_irrev(mech_name, therm_name, temp_range):
         if not rxn.rev_par:
             coeffs = [rxn.A, rxn.b, rxn.E]
             rev_par = calc_rev_Arrhenius(specs, rxn, reacs.index(rxn),
-                                         Tfit, units, coeffs
+                                         Tfit, coeffs
                                          )
         else:
             rev_par = rxn.rev_par
@@ -352,7 +362,7 @@ def convert_mech_irrev(mech_name, therm_name, temp_range):
                 coeffs = rxn.high
 
             rev_par = calc_rev_Arrhenius(specs, rxn, reacs.index(rxn),
-                                         Tfit, units, coeffs
+                                         Tfit, coeffs
                                          )
 
             if rxn.low:
@@ -389,7 +399,7 @@ def convert_mech_irrev(mech_name, therm_name, temp_range):
     mod_mech = 'mech_irrev.txt'
 
     # write new reaction list to new file
-    write_mech(mod_mech, elems, specs, reacs, units)
+    write_mech(mod_mech, elems, specs, reacs)
 
     return
 
