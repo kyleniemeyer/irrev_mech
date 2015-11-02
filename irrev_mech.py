@@ -280,7 +280,9 @@ def write_mech(filename, elems, specs, reacs, units):
                 line += thd_body[0] + '/' + thd_eff + '/ '
 
                 # move to next line if long
-                if len(line) >= 60 and rxn.thd_body.index(thd_body) is not (len(rxn.thd_body) - 1):
+                if (len(line) >= 60 and
+                    rxn.thd_body.index(thd_body) is not (len(rxn.thd_body)-1)
+                    ):
                     line += '\n'
                     file.write(line)
                     line = '  '
@@ -303,34 +305,12 @@ def convert_mech_irrev(mech_name, therm_name, temp_range):
 
     Input
     mech_name: string with reaction mechanism filename (e.g. 'mech.dat')
-    therm_name: string with thermodynamic database filename (e.g. 'therm.dat') or None if info in mech_name
+    therm_name: string with thermodynamic database filename (e.g. 'therm.dat')
+                or None if info in mech_name
     """
 
     # interpret reaction mechanism file
-    [elems, specs, reacs, units] = mech.read_mech(mech_name)
-
-    # interpret thermodynamic database file (if it exists)
-    if therm_name:
-        file = open(therm_name, 'r')
-        mech.read_thermo(file, elems, specs)
-        file.close()
-    else:
-        # copy therm data into new file
-        mech_file = open(mech_name, 'r')
-        file = open('therm_irrev.txt', 'w')
-
-        flag = False
-        for line in mech_file:
-            if line[0:4].lower() == 'ther':
-                file.write('thermo\n')
-                flag = True
-                continue
-
-            if flag: file.write(line)
-
-            if flag and line[0:3].lower() == 'end': break
-
-        file.close()
+    [elems, specs, reacs] = mech.read_mech(mech_name)
 
     # tuple holding fit temperatures
     #Tfit = 300.0, 1000.0, 5000.0
@@ -353,7 +333,9 @@ def convert_mech_irrev(mech_name, therm_name, temp_range):
         # Calculate explicit reverse Arrhenius parameters for reaction
         if not rxn.rev_par:
             coeffs = [rxn.A, rxn.b, rxn.E]
-            rev_par = calc_rev_Arrhenius(specs, rxn, reacs.index(rxn), Tfit, units, coeffs)
+            rev_par = calc_rev_Arrhenius(specs, rxn, reacs.index(rxn),
+                                         Tfit, units, coeffs
+                                         )
         else:
             rev_par = rxn.rev_par
 
@@ -369,7 +351,9 @@ def convert_mech_irrev(mech_name, therm_name, temp_range):
             elif rxn.high:
                 coeffs = rxn.high
 
-            rev_par = calc_rev_Arrhenius(specs, rxn, reacs.index(rxn), Tfit, units, coeffs)
+            rev_par = calc_rev_Arrhenius(specs, rxn, reacs.index(rxn),
+                                         Tfit, units, coeffs
+                                         )
 
             if rxn.low:
                 irrev_rxn.low = copy.copy(rev_par)
@@ -414,20 +398,25 @@ if __name__ == "__main__":
 
     # command line arguments
     parser = ArgumentParser(description = 'Generates reaction mechanism with '
-                                          'only irreversible reactions.')
+                                          'only irreversible reactions.'
+                            )
     parser.add_argument('-m', '--mech',
                         type = str,
                         required = True,
-                        help = 'Input mechanism filename (e.g., mech.dat).')
+                        help = 'Input mechanism filename (e.g., mech.dat).'
+                        )
     parser.add_argument('-t', '--thermo',
                         type = str,
                         default = None,
                         help = 'Thermodynamic database filename (e.g., '
-                        'therm.dat), or nothing if in mechanism.')
+                               'therm.dat), or nothing if in mechanism.'
+                        )
     parser.add_argument('-r', '--range',
                         type = float, nargs=2,
                         default = [300.0, 5000.0],
-                        help = 'Temperature range for fit in Kelvin (e.g., 300 5000).')
+                        help = 'Temperature range for fit in Kelvin '
+                               '(e.g., 300 5000).'
+                        )
 
     args = parser.parse_args()
     convert_mech_irrev(args.mech, args.thermo, args.range)
