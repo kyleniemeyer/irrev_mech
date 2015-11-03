@@ -145,7 +145,7 @@ def calc_rev_Arrhenius(specs, rxn, rxn_id, Tfit, coeffs):
               str(rxn_id) + '.'
               )
 
-    return [Ar, br, Er]
+    return val_lsq[0]
 
 
 def write_mech(filename, elems, specs, reacs):
@@ -271,7 +271,7 @@ def write_mech(filename, elems, specs, reacs):
 
         # write Lindemann low- or high-pressure limit Arrhenius parameters
         if rxn.pdep:
-            if rxn.low:
+            if len(rxn.low) > 0:
                 rxn.low[0] *= 1000. ** sum(rxn.reac_nu)
                 line = '  low /{:.4e}  {:.4e}  {:.4e} /\n'.format(rxn.low[0], rxn.low[1], rxn.low[2])
             else:
