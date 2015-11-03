@@ -8,9 +8,18 @@ from __future__ import print_function
 import copy
 import math
 from argparse import ArgumentParser
-import numpy as np
-from scipy.optimize import leastsq
 import warnings
+
+try:
+    import numpy as np
+except ImportError:
+    print('Error: NumPy must be installed.')
+    raise
+try:
+    from scipy.optimize import leastsq
+except ImportError:
+    print('Error: SciPy must be installed.')
+    raise
 
 # Local imports
 import chem_utilities as chem
@@ -24,7 +33,7 @@ def calc_rate_coeff(p, T):
     return k
 
 
-def calc_rev_rate_coeff(T, p_Arr, specs, reac):
+def calc_rev_rate_coeff(T, p_Arr, specs, rxn):
     """Calculate reverse Arrhenius rate coefficient."""
 
     # calculate forward reaction rate (ignoring pressure dependence, since it
@@ -37,17 +46,19 @@ def calc_rev_rate_coeff(T, p_Arr, specs, reac):
 
     Kp = 0.0
     # products
-    for sp in reac.prod:
+    for sp in rxn.prod:
         isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
-        Kp += reac.prod_nu[reac.prod.index(sp)] * spec_smh[isp]
+        Kp += rxn.prod_nu[rxn.prod.index(sp)] * spec_smh[isp]
 
     # reactants
-    for sp in reac.reac:
+    for sp in rxn.reac:
         isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
-        Kp -= reac.reac_nu[reac.reac.index(sp)] * spec_smh[isp]
+        Kp -= rxn.reac_nu[rxn.reac.index(sp)] * spec_smh[isp]
 
     Kp = math.exp(Kp)
-    Kc = Kp * (chem.PA / (chem.RU * T)) ** (sum(reac.prod_nu) - sum(reac.reac_nu))
+    Kc = Kp * (chem.PA / (chem.RU * T)) ** (sum(rxn.prod_nu) -
+                                            sum(rxn.reac_nu)
+                                            )
     k_rev = k_fwd / Kc
 
     return k_rev
@@ -60,15 +71,15 @@ def residuals(p, y, x):
     return err
 
 
-def calc_rev_Arrhenius(specs, reac, reac_id, Tfit, coeffs):
+def calc_rev_Arrhenius(specs, rxn, rxn_id, Tfit, coeffs):
     """Calculate reverse Arrhenius coefficients for a particular reaction.
 
     Using three temperatures, fit reverse Arrhenius coefficients by
     calcluating forward and reverse reaction rates.
 
     Input
-    reac_id: reaction index
-    reac:  reaction object
+    rxn_id: reaction index
+    rxn:  reaction object
     Tfit: tuple of three temperatures
     """
 
@@ -90,22 +101,28 @@ def calc_rev_Arrhenius(specs, reac, reac_id, Tfit, coeffs):
     # calculate reverse reaction rates for each temperature
 
     # T1
-    kr1 = calc_rev_rate_coeff(T1, p_Arr, specs, reac)
+    kr1 = calc_rev_rate_coeff(T1, p_Arr, specs, rxn)
 
     # T2
-    kr2 = calc_rev_rate_coeff(T2, p_Arr, specs, reac)
+    kr2 = calc_rev_rate_coeff(T2, p_Arr, specs, rxn)
 
     # T3
-    kr3 = calc_rev_rate_coeff(T3, p_Arr, specs, reac)
+    kr3 = calc_rev_rate_coeff(T3, p_Arr, specs, rxn)
 
     a1 = math.log(kr1)
     a2 = math.log(kr2)
     a3 = math.log(kr3)
 
     den = x1 * T1 * (T3 - T2) + x2 * T2 * (T1 - T3) + x3 * T3 * (T2 - T1)
-    br = (a1 * T1 * (T3 - T2) + a2 * T2 * (T1 - T3) + a3 * T3 * (T2 - T1)) / den
-    Er = T1 * T2 * T3 * (a1 * (x2 - x3) + a2 * (x3 - x1) + a3 * (x1 - x2)) / den
-    Ar = (a1 * T1 * (x2 * T2 - x3 * T3) + a2 * T2 * (x3 * T3 - x1 * T1) + a3 * T3 * (x1 * T1 - x2 * T2)) / den
+    br = (a1 * T1 * (T3 - T2) + a2 * T2 * (T1 - T3) +
+          a3 * T3 * (T2 - T1)
+          ) / den
+    Er = T1 * T2 * T3 * (a1 * (x2 - x3) + a2 * (x3 - x1) +
+                         a3 * (x1 - x2)
+                         ) / den
+    Ar = (a1 * T1 * (x2 * T2 - x3 * T3) + a2 * T2 * (x3 * T3 - x1 * T1) +
+          a3 * T3 * (x1 * T1 - x2 * T2)
+          ) / den
     Ar = math.exp(Ar)
 
     # Now perform nonlinear least-squares minimization using these
@@ -113,7 +130,7 @@ def calc_rev_Arrhenius(specs, reac, reac_id, Tfit, coeffs):
     x = np.linspace(T1, T3, 1000)
     y = np.zeros(len(x))
     for idx, val in enumerate(x):
-        y[idx] = calc_rev_rate_coeff(val, p_Arr, specs, reac)
+        y[idx] = calc_rev_rate_coeff(val, p_Arr, specs, rxn)
 
     # Start with low number of max function evals, increase if needed.
     warnings.filterwarnings('error')
@@ -125,7 +142,7 @@ def calc_rev_Arrhenius(specs, reac, reac_id, Tfit, coeffs):
             continue
     else:
         print('Warning: minimization failed to converge for reaction ' +
-              str(reac_id) + '.'
+              str(rxn_id) + '.'
               )
 
     return [Ar, br, Er]
@@ -181,11 +198,11 @@ def write_mech(filename, elems, specs, reacs):
 
         # third body in reactants
         if rxn.pdep:
-            if rxn.thd:
+            if rxn.thd_body_eff:
                 line += '(+m)'
             else:
                 line += '(+{:s})'.format(rxn.pdep_sp)
-        elif rxn.thd:
+        elif rxn.thd_body:
             line += '+m'
 
         if rxn.rev:
@@ -207,24 +224,24 @@ def write_mech(filename, elems, specs, reacs):
 
         # third body in products
         if rxn.pdep:
-            if rxn.thd:
+            if rxn.thd_body_eff:
                 line += '(+m)'
             else:
                 line += '(+{:s})'.format(rxn.pdep_sp)
-        elif rxn.thd:
+        elif rxn.thd_body:
             line += '+m'
 
         # Convert internal units to moles
         reac_ord = sum(rxn.reac_nu)
-        if rxn.thd:
-            rxn.A /= 1000. ** reac_ord
+        if rxn.thd_body:
+            rxn.A *= 1000. ** reac_ord
         elif rxn.pdep:
             # Low- (chemically activated bimolecular reaction) or
             # high-pressure (fall-off reaction) limit parameters
-            rxn.A /= 1000. ** (reac_ord - 1.)
+            rxn.A *= 1000. ** (reac_ord - 1.)
         else:
             # Elementary reaction
-            rxn.A /= 1000. ** (reac_ord - 1.)
+            rxn.A *= 1000. ** (reac_ord - 1.)
 
         # now add Arrhenius coefficients to the same line
         line += ' {:.4e} {:.4e} {:.4e}'.format(rxn.A, rxn.b, rxn.E)
@@ -236,15 +253,15 @@ def write_mech(filename, elems, specs, reacs):
         if rxn.rev:
             # Convert internal units to moles
             reac_ord = sum(rxn.prod_nu)
-            if rxn.thd:
-                rxn.rev_par[0] /= 1000. ** reac_ord
+            if rxn.thd_body:
+                rxn.rev_par[0] *= 1000. ** reac_ord
             elif rxn.pdep:
                 # Low- (chemically activated bimolecular reaction) or
                 # high-pressure (fall-off reaction) limit parameters
-                rxn.rev_par[0] /= 1000. ** (reac_ord - 1.)
+                rxn.rev_par[0] *= 1000. ** (reac_ord - 1.)
             else:
                 # Elementary reaction
-                rxn.rev_par[0] /= 1000. ** (reac_ord - 1.)
+                rxn.rev_par[0] *= 1000. ** (reac_ord - 1.)
 
             line = '  rev/ {:.4e}  {:.4e}  {:.4e} /\n'.format(rxn.rev_par[0],
                                                               rxn.rev_par[1],
@@ -255,12 +272,11 @@ def write_mech(filename, elems, specs, reacs):
         # write Lindemann low- or high-pressure limit Arrhenius parameters
         if rxn.pdep:
             if rxn.low:
-                rxn.low[0] /= 1000. ** sum(rxn.reac_nu)
+                rxn.low[0] *= 1000. ** sum(rxn.reac_nu)
                 line = '  low /{:.4e}  {:.4e}  {:.4e} /\n'.format(rxn.low[0], rxn.low[1], rxn.low[2])
             else:
-                rxn.low[0] /= 1000. ** (sum(rxn.reac_nu) - 2.)
+                rxn.high[0] *= 1000. ** (sum(rxn.reac_nu) - 2.)
                 line = '  high /{:.4e}  {:.4e}  {:.4e} /\n'.format(rxn.high[0], rxn.high[1], rxn.high[2])
-
             file.write(line)
 
         # write Troe parameters if any
@@ -272,7 +288,6 @@ def write_mech(filename, elems, specs, reacs):
                 line = '  troe/ {:.4e} {:.4e} {:.4e} {:.4e} /\n'.format(troe[0], troe[1], troe[2], troe[3])
             file.write(line)
 
-
         # write SRI parameters if any
         if rxn.sri:
             sri = rxn.sri_par
@@ -280,18 +295,50 @@ def write_mech(filename, elems, specs, reacs):
                 line = '  sri/ {:.4e} {:.4e} {:.4e} /\n'.format(sri[0], sri[1], sri[2])
             else:
                 line = '  sri/ {:.4e} {:.4e} {:.4e} {:.4e} {:.4e} /\n'.format(sri[0], sri[1], sri[2], sri[3], sri[4])
+            file.write(line)
 
+        # write CHEB parameters, if any
+        if rxn.cheb:
+            line = ('  pcheb / {:.2f} '.format(rxn.cheb_plim[0] / chem.PA) +
+                    '{:.2f} /\n'.format(rxn.cheb_plim[1] / chem.PA) +
+                    '  tcheb / {:.1f} '.format(rxn.cheb_tlim[0]) +
+                    '{:.1f} /\n'.format(rxn.cheb_tlim[1]) +
+                    '  cheb / {} {} '.format(rxn.cheb_n_temp, rxn.cheb_n_pres)
+                    )
+            file.write(line)
+
+            line = '  cheb /'
+            for par in rxn.cheb_par:
+                if len(line) > 70:
+                    file.write(line + ' /\n')
+                    line = '  cheb /'
+                line += ' {: 7.5e}'.format(par)
+            file.write(line + line + ' /\n')
+
+        # write PLOG parameters, if any
+        if rxn.plog:
+            for par in rxn.plog_par:
+                # convert to appropriate units
+                par[0] /= chem.PA
+                par[1] *= 1000. ** (sum(rxn.reac_nu) - 1.)
+
+                line = ('  plog/ {:.2e} {:.4e} '.format(par[0], par[1]) +
+                        '{:.4e} {:.4e} /\n'.format(par[2], par[3])
+                        )
+                file.write(line)
 
         # third-body efficiencies
-        if rxn.thd_body:
+        if len(rxn.thd_body_eff) > 0:
             line = '  '
-            for thd_body in rxn.thd_body:
+            for thd_body in rxn.thd_body_eff:
                 thd_eff = '{:.2f}'.format(thd_body[1])
                 line += thd_body[0] + '/' + thd_eff + '/ '
 
                 # move to next line if long
                 if (len(line) >= 60 and
-                    rxn.thd_body.index(thd_body) is not (len(rxn.thd_body)-1)
+                    (rxn.thd_body_eff.index(thd_body)
+                     is not (len(rxn.thd_body_eff)-1)
+                     )
                     ):
                     line += '\n'
                     file.write(line)
@@ -327,6 +374,10 @@ def convert_mech_irrev(mech_name, therm_name=None, temp_range=[300.,5000.]):
     Tmid = temp_range[0] + 0.5*(temp_range[1] - temp_range[0])
     Tfit = temp_range[0], Tmid, temp_range[1]
 
+    # Check for any Chebyshev reactions; not currently supported
+    if any([rxn for rxn in reacs if rxn.cheb]):
+        raise NotImplementedError('CHEB reactions not yet supported')
+
     # now loop through reversible reactions
     for rxn in [rxn for rxn in reacs[:] if rxn.rev]:
 
@@ -353,9 +404,8 @@ def convert_mech_irrev(mech_name, therm_name=None, temp_range=[300.,5000.]):
         irrev_rxn.b = rev_par[1]
         irrev_rxn.E = rev_par[2]
 
-        # get reverse high-/low-pressure limit coeffs
         if rxn.pdep:
-
+            # get reverse high-/low-pressure limit coeffs
             if rxn.low:
                 coeffs = rxn.low
             elif rxn.high:
@@ -369,6 +419,21 @@ def convert_mech_irrev(mech_name, therm_name=None, temp_range=[300.,5000.]):
                 irrev_rxn.low = copy.copy(rev_par)
             elif rxn.high:
                 irrev_rxn.high = copy.copy(rev_par)
+
+        elif rxn.plog:
+            # Pressure-log reaction
+            irrev_rxn.plog = True
+            irrev_rxn.plog_par = []
+            for par in rxn.plog_par:
+                rev_par = calc_rev_Arrhenius(specs, rxn, reacs.index(rxn),
+                                             Tfit, [par[1], par[2], par[3]]
+                                             )
+                plog_par = [par[0], rev_par[0], rev_par[1], rev_par[2]]
+                irrev_rxn.plog_par.append(plog_par)
+
+        elif rxn.cheb:
+            irrev_rxn.cheb = True
+            raise NotImplementedError('CHEB reactions not yet supported')
 
         rxn.rev_par = []
         irrev_rxn.rev_par = []
