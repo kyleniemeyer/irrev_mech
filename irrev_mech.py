@@ -198,10 +198,10 @@ def write_mech(filename, elems, specs, reacs):
 
         # third body in reactants
         if rxn.pdep:
-            if rxn.thd_body_eff:
-                line += '(+m)'
-            else:
+            if rxn.pdep_sp:
                 line += '(+{:s})'.format(rxn.pdep_sp)
+            else:
+                line += '(+m)'
         elif rxn.thd_body:
             line += '+m'
 
@@ -224,10 +224,10 @@ def write_mech(filename, elems, specs, reacs):
 
         # third body in products
         if rxn.pdep:
-            if rxn.thd_body_eff:
-                line += '(+m)'
-            else:
+            if rxn.pdep_sp:
                 line += '(+{:s})'.format(rxn.pdep_sp)
+            else:
+                line += '(+m)'
         elif rxn.thd_body:
             line += '+m'
 
