@@ -1,3 +1,5 @@
 *.txt
 *.dat
 *.inp
+dist/
+irrev_mech.egg-info
