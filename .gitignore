@@ -3,3 +3,4 @@
 *.inp
 dist/
 irrev_mech.egg-info
+*.pyc
