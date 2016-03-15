@@ -28,8 +28,8 @@ PA = 101325.0
 class CommonEqualityMixin(object):
     def __eq__(self, other):
         try:
-            for key, value in self.__dict__.iteritems():
-                if not key in other.__dict__:
+            for key, value in self.__dict__.items():
+                if key not in other.__dict__:
                     return False
                 if isinstance(value, np.ndarray):
                     if not np.array_equal(value, other.__dict__[key]):
@@ -37,7 +37,7 @@ class CommonEqualityMixin(object):
                 elif value != other.__dict__[key]:
                     return False
             return True
-        except Exception, e:
+        except Exception:
             return False
 
     def __ne__(self, other):
@@ -158,7 +158,7 @@ class ReacInfo(CommonEqualityMixin):
         self.prod = products
         self.prod_nu = prod_nu
 
-        ## Arrhenius coefficients
+        # Arrhenius coefficients
         # pre-exponential factor [m, kmol, s]
         self.A = A
         # Temperature exponent [-]

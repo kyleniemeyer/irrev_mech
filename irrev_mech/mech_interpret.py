@@ -3,6 +3,8 @@
 
 # Python 2 compatibility
 from __future__ import division
+from __future__ import print_function
+from __future__ import absolute_import
 
 # Standard libraries
 import sys
@@ -12,8 +14,8 @@ import re
 import numpy as np
 
 # Local imports
-import chem_utilities as chem
-import utils
+from . import chem_utilities as chem
+from . import utils
 
 # Related module
 CANTERA_FLAG = False

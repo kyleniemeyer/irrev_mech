@@ -3,6 +3,7 @@
 # Python 2 compatibility
 from __future__ import division
 from __future__ import print_function
+from __future__ import absolute_import
 
 # Standard libraries
 import copy
@@ -22,8 +23,8 @@ except ImportError:
     raise
 
 # Local imports
-import chem_utilities as chem
-import mech_interpret as mech
+from . import chem_utilities as chem
+from . import mech_interpret as mech
 
 
 def calc_rate_coeff(p, T):
@@ -47,12 +48,12 @@ def calc_rev_rate_coeff(T, p_Arr, specs, rxn):
     Kp = 0.0
     # products
     for sp in rxn.prod:
-        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
+        isp = next(i for i in range(len(specs)) if specs[i].name == sp)
         Kp += rxn.prod_nu[rxn.prod.index(sp)] * spec_smh[isp]
 
     # reactants
     for sp in rxn.reac:
-        isp = next(i for i in xrange(len(specs)) if specs[i].name == sp)
+        isp = next(i for i in range(len(specs)) if specs[i].name == sp)
         Kp -= rxn.reac_nu[rxn.reac.index(sp)] * spec_smh[isp]
 
     Kp = math.exp(Kp)
@@ -159,7 +160,7 @@ def write_mech(filename, elems, specs, reacs):
     file.write('elements\n')
 
     elem_wt_orig = chem.get_elem_wt()
-    elem_new = set(mech.elem_wt.iteritems()) - set(elem_wt_orig.iteritems())
+    elem_new = set(mech.elem_wt.items()) - set(elem_wt_orig.items())
     elem_new = dict(elem_new)
     for e in elems:
         # write atomic weight if necessary
