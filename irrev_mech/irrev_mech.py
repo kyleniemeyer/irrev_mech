@@ -469,8 +469,7 @@ def convert_mech_irrev(mech_name, therm_name=None, temp_range=[300.,5000.]):
     return
 
 
-if __name__ == "__main__":
-
+def main():
     # command line arguments
     parser = ArgumentParser(description = 'Generates reaction mechanism with '
                                           'only irreversible reactions.',
@@ -496,3 +495,6 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     convert_mech_irrev(args.mech, args.thermo, args.range)
+
+if __name__ == "__main__":
+    main()
