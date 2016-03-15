@@ -473,7 +473,8 @@ if __name__ == "__main__":
 
     # command line arguments
     parser = ArgumentParser(description = 'Generates reaction mechanism with '
-                                          'only irreversible reactions.'
+                                          'only irreversible reactions.',
+                            prog='irrev_mech',
                             )
     parser.add_argument('-m', '--mech',
                         type = str,
