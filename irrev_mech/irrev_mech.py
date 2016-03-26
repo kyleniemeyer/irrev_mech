@@ -1,4 +1,5 @@
-#! /usr/bin/env python
+"""Makes reactions in chemical kinetic model all irreversible.
+"""
 
 # Python 2 compatibility
 from __future__ import division
@@ -8,7 +9,6 @@ from __future__ import absolute_import
 # Standard libraries
 import copy
 import math
-from argparse import ArgumentParser
 import warnings
 
 try:
@@ -468,34 +468,3 @@ def convert_mech_irrev(mech_name, therm_name=None, temp_range=[300.,5000.]):
     write_mech(mod_mech, elems, specs, reacs)
 
     return
-
-
-def main():
-    # command line arguments
-    parser = ArgumentParser(description = 'Generates reaction mechanism with '
-                                          'only irreversible reactions.',
-                            prog='irrev_mech',
-                            )
-    parser.add_argument('-m', '--mech',
-                        type = str,
-                        required = True,
-                        help = 'Input mechanism filename (e.g., mech.dat).'
-                        )
-    parser.add_argument('-t', '--thermo',
-                        type = str,
-                        default = None,
-                        help = 'Thermodynamic database filename (e.g., '
-                               'therm.dat), or nothing if in mechanism.'
-                        )
-    parser.add_argument('-r', '--range',
-                        type = float, nargs=2,
-                        default = [300.0, 5000.0],
-                        help = 'Temperature range for fit in Kelvin '
-                               '(e.g., 300 5000).'
-                        )
-
-    args = parser.parse_args()
-    convert_mech_irrev(args.mech, args.thermo, args.range)
-
-if __name__ == "__main__":
-    main()

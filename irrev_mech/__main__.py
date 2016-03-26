@@ -1,4 +1,44 @@
-from .irrev_mech import main
+#! /usr/bin/env python
+from __future__ import absolute_import
+
+# Standard libraries
+import sys
+from argparse import ArgumentParser
+
+# Local import
+from .irrev_mech import convert_mech_irrev
+
+def get_parser():
+    # command line arguments
+    parser = ArgumentParser(description = 'Generates chemical kinetic model '
+                                          'with only irreversible reactions.',
+                            prog='irrev_mech',
+                            )
+    parser.add_argument('-m', '--mech',
+                        type = str,
+                        required = True,
+                        help = 'Input mechanism filename (e.g., mech.dat).'
+                        )
+    parser.add_argument('-t', '--thermo',
+                        type = str,
+                        default = None,
+                        help = 'Thermodynamic database filename (e.g., '
+                               'therm.dat), or nothing if in mechanism.'
+                        )
+    parser.add_argument('-r', '--range',
+                        type = float, nargs=2,
+                        default = [300.0, 5000.0],
+                        help = 'Temperature range for fit in Kelvin '
+                               '(e.g., 300 5000).'
+                        )
+
+    return parser.parse_args()
+
+def main(args=None):
+    if args is None:
+        args = get_parser()
+
+    convert_mech_irrev(args.mech, args.thermo, args.range)
 
 if __name__ == '__main__':
-    main()
+    sys.exit(main())
