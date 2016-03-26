@@ -7,7 +7,7 @@ This utility converts a Chemkin-format reaction mechanism with reversible reacti
 
 It does this by fitting reverse Arrhenius coefficients using a nonlinear least-squares minimization.
 
-`irrev_mech` requires [Python] 2.x and the [SciPy] stack, but no additional libraries (i.e., Chemkin, Cantera). It has only been tested on [Python] 2.7, but probably works on earlier versions.
+`irrev_mech` requires [Python] (2.x or 3.x) and the [SciPy] stack, but no additional libraries (i.e., Chemkin, Cantera). It has only been tested on [Python] 2.7, but probably works on earlier versions.
 
 Usage
 -------
@@ -29,7 +29,7 @@ The default temperature range used for parameter fitting is 300 K to 5000 K. Thi
 License
 -------
 
-`irrev_mech` is released under the modified BSD license, see LICENSE for details. 
+`irrev_mech` is released under the MIT license, see LICENSE for details.
 
 Citation
 --------
@@ -39,7 +39,7 @@ If you use this software as part of a scholarly publication, please cite the sof
 Further Reading
 ---------------
 
-The three reverse Arrhenius coefficients are determined using a nonlinear least-squares minimization, using the [SciPy] function `scipy.optimize.leastsq`. The fit is performed using a large number of calculated reverse rate coefficients, densely sampled over the specified temperature range. The initial guess for this minimization comes from an analytical fit to three temperatures (the high and low values of the range, plus a midpoint). See the appendix of Niemeyer and Sung's paper for more details: 
+The three reverse Arrhenius coefficients are determined using a nonlinear least-squares minimization, using the [SciPy] function `scipy.optimize.leastsq`. The fit is performed using a large number of calculated reverse rate coefficients, densely sampled over the specified temperature range. The initial guess for this minimization comes from an analytical fit to three temperatures (the high and low values of the range, plus a midpoint). See the appendix of Niemeyer and Sung's paper for more details:
 
 * KE Niemeyer and CJ Sung. "Accelerating moderately stiff chemical kinetics in reactive-flow simulations using GPUs." *J. Comput. Phys.*, 256:854-871, 2014. doi:[10.1016/j.jcp.2013.09.025](http://dx.doi.org/10.1016/j.jcp.2013.09.025)
 
