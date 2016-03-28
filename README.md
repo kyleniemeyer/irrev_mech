@@ -16,7 +16,7 @@ Usage
 
     $ python -m irrev_mech [options]
 
-or installed as a package using `pip install --user irrev_mech` or via `python setup.py install --user`, and called using
+or installed as a package using `pip install --user irrev_mech` or via `python setup.py install`, and called using
 
     $ irrev_mech [options]
 
