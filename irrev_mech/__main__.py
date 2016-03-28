@@ -10,11 +10,12 @@ from .irrev_mech import convert_mech_irrev
 
 def get_parser():
     # command line arguments
-    parser = ArgumentParser(description = 'Generates chemical kinetic model '
-                                          'with only irreversible reactions.',
+    parser = ArgumentParser(description = 'Generates chemical kinetic '
+                                          'reaction mechanism with only '
+                                          'irreversible reactions.',
                             prog='irrev_mech',
                             )
-    parser.add_argument('-m', '--mech',
+    parser.add_argument('-c', '--chem',
                         type = str,
                         required = True,
                         help = 'Input mechanism filename (e.g., mech.dat).'
@@ -38,7 +39,7 @@ def main(args=None):
     if args is None:
         args = get_parser()
 
-    convert_mech_irrev(args.mech, args.thermo, args.range)
+    convert_mech_irrev(args.chem, args.thermo, args.range)
 
 if __name__ == '__main__':
     sys.exit(main())

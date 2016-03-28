@@ -20,19 +20,19 @@ or installed as a package using `pip install --user irrev_mech` or via `python s
 
     $ irrev_mech [options]
 
-Use the option `-h` or `--help` to see the full usage instructions. To generate an irreversible mechanism, from the command line, use `python -m irrev_mech -m mechname -t thermname` where `mechname` and `thermname` are the names of the mechanism file and thermodynamic database, e.g.:
+Use the option `-h` or `--help` to see the full usage instructions. To generate an irreversible mechanism, from the command line, use `python -m irrev_mech -c mech_name -t thermname` where `mech_name` and `therm_name` are the names of the chemical kinetics reaction mechanism file and thermodynamic database, e.g.:
 
-    $ python irrev_mech.py -m mech.dat -t therm.dat
+    $ python irrev_mech.py -c mech.dat -t therm.dat
 
-You can also run `irrev_mech` without a thermodynamic database if the information is held in the mechanism file (after the species are declared), e.g.:
+You can also run `irrev_mech` without a thermodynamic database if the information is held in the chemistry mechanism file (after the species are declared), e.g.:
 
-    $ python -m irrev_mech -m mech.dat
+    $ python -m irrev_mech -c mech.dat
 
-The new mechanism has the name `mech_irrev.txt`.
+The new model file has the name `mech_irrev.txt`.
 
 The default temperature range used for parameter fitting is 300 K to 5000 K. This can be changed by specifying the `-r` or `--range` command line option, e.g.:
 
-    $ python -m irrev_mech -m mech.dat -t therm.dat -r 1000 3000
+    $ python -m irrev_mech -c mech.dat -t therm.dat -r 1000 3000
 
 License
 -------
