@@ -11,7 +11,7 @@ from os import path
 
 here = path.abspath(path.dirname(__file__))
 
-with open(path.join('irrev_mech', '_version.py')) as version_file:
+with open(path.join(here, 'irrev_mech', '_version.py')) as version_file:
     exec(version_file.read())
 
 # Get the long description from the relevant file
