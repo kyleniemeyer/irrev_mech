@@ -12,13 +12,15 @@ It does this by fitting reverse Arrhenius coefficients using a nonlinear least-s
 Usage
 -------
 
-`irrev_mech` can be used locally or installed as a package using `pip install --user irrev_mech` or via `python setup.py install --user`.
-
-Either way, it can be called using
+`irrev_mech` can be used locally via
 
     $ python -m irrev_mech [options]
 
-Use the command `python -m irrev_mech -h` to see the full usage instructions. To generate an irreversible mechanism, from the command line, use `python -m irrev_mech -m mechname -t thermname` where `mechname` and `thermname` are the names of the mechanism file and thermodynamic database, e.g.:
+or installed as a package using `pip install --user irrev_mech` or via `python setup.py install --user`, and called using
+
+    $ irrev_mech [options]
+
+Use the option `-h` or `--help` to see the full usage instructions. To generate an irreversible mechanism, from the command line, use `python -m irrev_mech -m mechname -t thermname` where `mechname` and `thermname` are the names of the mechanism file and thermodynamic database, e.g.:
 
     $ python irrev_mech.py -m mech.dat -t therm.dat
 
