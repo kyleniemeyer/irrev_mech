@@ -1,7 +1,7 @@
 irrev_mech
 =======
 
-[![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.44289.svg)](http://dx.doi.org/10.5281/zenodo.44289)
+[![DOI](https://zenodo.org/badge/doi/10.5281/zenodo.48480.svg)](http://dx.doi.org/10.5281/zenodo.48480)
 
 This utility converts a Chemkin-format reaction mechanism with reversible reactions to one with only irreversible reactions.
 
