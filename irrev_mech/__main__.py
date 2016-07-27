@@ -32,6 +32,10 @@ def get_parser():
                         help = 'Temperature range for fit in Kelvin '
                                '(e.g., 300 5000).'
                         )
+    parser.add_argument('-o', '--output',
+                        type = str,
+                        default = 'mech_irrev.txt',
+                        help = 'Output file name, default "mech_irrev.txt"')
 
     return parser.parse_args()
 
@@ -39,7 +43,7 @@ def main(args=None):
     if args is None:
         args = get_parser()
 
-    convert_mech_irrev(args.chem, args.thermo, args.range)
+    convert_mech_irrev(args.chem, args.thermo, args.range, args.output)
 
 if __name__ == '__main__':
     sys.exit(main())
