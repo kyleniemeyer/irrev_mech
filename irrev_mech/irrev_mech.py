@@ -358,7 +358,7 @@ def write_mech(filename, elems, specs, reacs):
     return
 
 
-def convert_mech_irrev(mech_name, therm_name=None, temp_range=[300.,5000.]):
+def convert_mech_irrev(mech_name, therm_name=None, temp_range=[300.,5000.], output_file="mech_irrev.txt"):
     """Convert Chemkin-style mechanism with reversible reactions.
 
     Input
@@ -462,9 +462,7 @@ def convert_mech_irrev(mech_name, therm_name=None, temp_range=[300.,5000.]):
         if not fnd_dup:
             reacs[reacs.index(rxn)].dup = False
 
-    mod_mech = 'mech_irrev.txt'
-
     # write new reaction list to new file
-    write_mech(mod_mech, elems, specs, reacs)
+    write_mech(output_file, elems, specs, reacs)
 
     return
