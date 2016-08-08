@@ -36,6 +36,10 @@ def get_parser():
                         type = str,
                         default = 'mech_irrev.txt',
                         help = 'Output file name, default "mech_irrev.txt"')
+    parser.add_argument('-n', '--numprocs',
+                        type = int,
+                        default = None,
+                        help = 'Number of processes to use. Default: Number of CPUs on the machine.')
 
     return parser.parse_args()
 
