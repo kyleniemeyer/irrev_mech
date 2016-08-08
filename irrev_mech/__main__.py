@@ -47,7 +47,7 @@ def main(args=None):
     if args is None:
         args = get_parser()
 
-    convert_mech_irrev(args.chem, args.thermo, args.range, args.output)
+    convert_mech_irrev(args.chem, args.thermo, args.range, args.output, args.numprocs)
 
 if __name__ == '__main__':
     sys.exit(main())
