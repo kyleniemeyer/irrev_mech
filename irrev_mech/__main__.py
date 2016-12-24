@@ -36,6 +36,10 @@ def get_parser():
                         type = str,
                         default = 'mech_irrev.txt',
                         help = 'Output file name, default "mech_irrev.txt"')
+    parser.add_argument('-n', '--numprocs',
+                        type = int,
+                        default = None,
+                        help = 'Number of processes to use. Default: Number of CPUs on the machine.')
 
     return parser.parse_args()
 
@@ -43,7 +47,7 @@ def main(args=None):
     if args is None:
         args = get_parser()
 
-    convert_mech_irrev(args.chem, args.thermo, args.range, args.output)
+    convert_mech_irrev(args.chem, args.thermo, args.range, args.output, args.numprocs)
 
 if __name__ == '__main__':
     sys.exit(main())

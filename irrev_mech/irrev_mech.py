@@ -10,6 +10,8 @@ from __future__ import absolute_import
 import copy
 import math
 import warnings
+from multiprocessing import Pool
+from itertools import repeat
 
 try:
     import numpy as np
@@ -358,7 +360,81 @@ def write_mech(filename, elems, specs, reacs):
     return
 
 
-def convert_mech_irrev(mech_name, therm_name=None, temp_range=[300.,5000.], output_file="mech_irrev.txt"):
+def process_reaction(arg):
+    """
+    Worker process for the multiprocessing. The single argument is expected to be a tuple
+    with elements:
+        0) Instance of ReacInfo
+        1) List of species in the mechanism
+        2) Index of the current reaction
+        3) Tuple of fitting temperatures
+    """
+    rxn = arg[0]
+    specs = arg[1]
+    idx = arg[2]
+    Tfit = arg[3]
+    if not rxn.rev:
+        return (idx, rxn, None)
+    # create 2 irreversible reactions from reversible
+    rxn.rev = False
+    irrev_rxn = copy.deepcopy(rxn)
+
+    # switch reactants and products
+    irrev_rxn.reac = copy.copy(rxn.prod)
+    irrev_rxn.reac_nu = copy.copy(rxn.prod_nu)
+    irrev_rxn.prod = copy.copy(rxn.reac)
+    irrev_rxn.prod_nu = copy.copy(rxn.reac_nu)
+
+    # Calculate explicit reverse Arrhenius parameters for reaction
+    if not rxn.rev_par:
+        coeffs = [rxn.A, rxn.b, rxn.E]
+        rev_par = calc_rev_Arrhenius(specs, rxn, idx,
+                                     Tfit, coeffs
+                                     )
+    else:
+        rev_par = rxn.rev_par
+
+    irrev_rxn.A = rev_par[0]
+    irrev_rxn.b = rev_par[1]
+    irrev_rxn.E = rev_par[2]
+
+    if rxn.pdep:
+        # get reverse high-/low-pressure limit coeffs
+        if rxn.low:
+            coeffs = rxn.low
+        elif rxn.high:
+            coeffs = rxn.high
+
+        rev_par = calc_rev_Arrhenius(specs, rxn, idx,
+                                     Tfit, coeffs
+                                     )
+
+        if rxn.low:
+            irrev_rxn.low = copy.copy(rev_par)
+        elif rxn.high:
+            irrev_rxn.high = copy.copy(rev_par)
+
+    elif rxn.plog:
+        # Pressure-log reaction
+        irrev_rxn.plog = True
+        irrev_rxn.plog_par = []
+        for par in rxn.plog_par:
+            rev_par = calc_rev_Arrhenius(specs, rxn, idx,
+                                         Tfit, [par[1], par[2], par[3]]
+                                         )
+            plog_par = [par[0], rev_par[0], rev_par[1], rev_par[2]]
+            irrev_rxn.plog_par.append(plog_par)
+
+    elif rxn.cheb:
+        irrev_rxn.cheb = True
+        raise NotImplementedError('CHEB reactions not yet supported')
+
+    rxn.rev_par = []
+    irrev_rxn.rev_par = []
+    return (idx, rxn, irrev_rxn)
+
+
+def convert_mech_irrev(mech_name, therm_name=None, temp_range=[300.,5000.], output_file="mech_irrev.txt", n_procs=None):
     """Convert Chemkin-style mechanism with reversible reactions.
 
     Input
@@ -379,68 +455,15 @@ def convert_mech_irrev(mech_name, therm_name=None, temp_range=[300.,5000.], outp
     if any([rxn for rxn in reacs if rxn.cheb]):
         raise NotImplementedError('CHEB reactions not yet supported')
 
-    # now loop through reversible reactions
-    for rxn in [rxn for rxn in reacs[:] if rxn.rev]:
+    with Pool(processes=n_procs) as pool:
+        result = pool.map(process_reaction, zip(reacs, repeat(specs), [reacs.index(rxn) for rxn in reacs], repeat(Tfit)))
 
-        # create 2 irreversible reactions from reversible
-        rxn.rev = False
-        irrev_rxn = copy.deepcopy(rxn)
-
-        # switch reactants and products
-        irrev_rxn.reac = copy.copy(rxn.prod)
-        irrev_rxn.reac_nu = copy.copy(rxn.prod_nu)
-        irrev_rxn.prod = copy.copy(rxn.reac)
-        irrev_rxn.prod_nu = copy.copy(rxn.reac_nu)
-
-        # Calculate explicit reverse Arrhenius parameters for reaction
-        if not rxn.rev_par:
-            coeffs = [rxn.A, rxn.b, rxn.E]
-            rev_par = calc_rev_Arrhenius(specs, rxn, reacs.index(rxn),
-                                         Tfit, coeffs
-                                         )
-        else:
-            rev_par = rxn.rev_par
-
-        irrev_rxn.A = rev_par[0]
-        irrev_rxn.b = rev_par[1]
-        irrev_rxn.E = rev_par[2]
-
-        if rxn.pdep:
-            # get reverse high-/low-pressure limit coeffs
-            if rxn.low:
-                coeffs = rxn.low
-            elif rxn.high:
-                coeffs = rxn.high
-
-            rev_par = calc_rev_Arrhenius(specs, rxn, reacs.index(rxn),
-                                         Tfit, coeffs
-                                         )
-
-            if rxn.low:
-                irrev_rxn.low = copy.copy(rev_par)
-            elif rxn.high:
-                irrev_rxn.high = copy.copy(rev_par)
-
-        elif rxn.plog:
-            # Pressure-log reaction
-            irrev_rxn.plog = True
-            irrev_rxn.plog_par = []
-            for par in rxn.plog_par:
-                rev_par = calc_rev_Arrhenius(specs, rxn, reacs.index(rxn),
-                                             Tfit, [par[1], par[2], par[3]]
-                                             )
-                plog_par = [par[0], rev_par[0], rev_par[1], rev_par[2]]
-                irrev_rxn.plog_par.append(plog_par)
-
-        elif rxn.cheb:
-            irrev_rxn.cheb = True
-            raise NotImplementedError('CHEB reactions not yet supported')
-
-        rxn.rev_par = []
-        irrev_rxn.rev_par = []
-
-        # now insert into reaction list
-        reacs.insert(reacs.index(rxn) + 1, irrev_rxn)
+    reacs = []
+    for idx, rxn, irrev_rxn in sorted(result, key=lambda tup: tup[0]):
+        # now recreate reaction list
+        reacs.append(rxn)
+        if irrev_rxn:
+            reacs.append(irrev_rxn)
 
     # Need to reevaluate duplicate reactions. Some marked as duplicate when
     # reversible may no longer be.
