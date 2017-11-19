@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 ### Fixed
 
 ### Changed
+- Removed claim of Python 2.x compatibility
 
 
 ## [2.1.0] - 2016-12-24

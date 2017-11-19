@@ -7,7 +7,7 @@ This utility converts a Chemkin-format reaction mechanism with reversible reacti
 
 It does this by fitting reverse Arrhenius coefficients using a nonlinear least-squares minimization.
 
-`irrev_mech` requires [Python] (2.x or 3.x) and the [SciPy] stack, but no additional libraries (i.e., Chemkin, Cantera). It has only been tested on [Python] 2.7, but probably works on earlier versions.
+`irrev_mech` requires [Python] 3.x and the [SciPy] stack, but no additional libraries (i.e., Chemkin, Cantera). It has only been tested on [Python] 3.5 and 3.6.
 
 Usage
 -------
