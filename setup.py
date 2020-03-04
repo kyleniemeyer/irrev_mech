@@ -11,7 +11,7 @@ from os import path
 
 here = path.abspath(path.dirname(__file__))
 
-with open(path.join(here, 'irrev_mech', '_version.py')) as version_file:
+with open(path.join(here, 'mech_util', '_version.py')) as version_file:
     exec(version_file.read())
 
 # Get the long description from the relevant file
@@ -26,12 +26,12 @@ setup(
     # https://packaging.python.org/en/latest/single_source_version.html
     version=__version__,
 
-    description='Chemical kinetic model irreversible reaction converter',
+    description='Chemical kinetic model utility',
     long_description=long_description,
 
     # Author details
     author='Kyle Niemeyer',
-    author_email='kyle.niemeyer@gmail.com',
+    author_email='kyle.niemeyer@oregonstate.edu',
 
     # The project's main homepage.
     url='https://github.com/kyleniemeyer/irrev_mech',
@@ -42,7 +42,7 @@ setup(
 
     entry_points={
         'console_scripts': [
-            'irrev_mech=irrev_mech.__main__:main',
+            'mech_util=mech_util.__main__:main',
         ],
     },
 

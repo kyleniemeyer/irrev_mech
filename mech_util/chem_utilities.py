@@ -2,27 +2,32 @@
 
 """
 
-# Python 2 compatibility
-from __future__ import division
-
-# Standard libraries
-import math
-
 import numpy as np
+import pint
 
-__all__ = ['RU', 'RUC', 'RU_JOUL', 'PA', 'get_elem_wt',
+__all__ = ['get_elem_wt', 'units', 'Q_', 'AVAG', 'GAS_CONSTANT',
            'ReacInfo', 'SpecInfo', 'calc_spec_smh']
 
 # universal gas constants, SI units
-RU = 8314.4621  # J/(kmole * K)
-RU_JOUL = 8.3144621
-RUC = (RU / 4.18400)  # cal/(mole * K)
+#RU = 8314.4621  # J/(kmole * K)
+#RU_JOUL = 8.3144621
+#RUC = (RU / 4.18400)  # cal/(mole * K)
 
 # Avogadro's number
 AVAG = 6.0221367e23
 
 # pressure of one standard atmosphere [Pa]
-PA = 101325.0
+#PA = 101325.0
+
+
+units = pint.UnitRegistry()
+"""Unit registry to contain the units used in PyKED"""
+
+units.define('cm3 = centimeter**3')
+units.define('evolts = electron_volts')
+Q_ = units.Quantity
+
+GAS_CONSTANT = Q_(8314.4621, 'joule/(kmole*kelvin)')
 
 
 class CommonEqualityMixin(object):
@@ -167,8 +172,8 @@ class ReacInfo(CommonEqualityMixin):
         self.E = E
 
         # reversible reaction properties
-        self.rev = rev
-        self.rev_par = []  # reverse A, b, E
+        self.rev = rev      # reaction is reversible
+        self.rev_par = []   # explicit reverse A, b, E
 
         # duplicate reaction
         self.dup = False
@@ -197,7 +202,10 @@ class ReacInfo(CommonEqualityMixin):
         # Number of pressure values over which fit computed.
         self.cheb_n_pres = 0
         # Pressure limits for Chebyshev fit [Pa]
-        self.cheb_plim = [0.001 * PA, 100. * PA]
+        self.cheb_plim = [
+            Q_(0.001, 'atm').to('pascal'), 
+            Q_(100.0, 'atm').to('pascal')
+            ]
         # Temperature limits for Chebyshev fit [K]
         self.cheb_tlim = [300., 2500.]
         # 2D array of Chebyshev fit coefficients
@@ -266,7 +274,7 @@ def calc_spec_smh(T, specs):
 
     spec_smh = []
 
-    Tlog = math.log(T)
+    Tlog = np.log(T)
     T2 = T * T
     T3 = T2 * T
     T4 = T3 * T

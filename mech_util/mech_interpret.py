@@ -1,27 +1,19 @@
 """Chemkin-format mechanism interpreter module.
 """
 
-# Python 2 compatibility
-from __future__ import division
-from __future__ import print_function
-from __future__ import absolute_import
-
 # Standard libraries
 import sys
-import math
 import re
 
 import numpy as np
 
 # Local imports
-from . import chem_utilities as chem
+from .chem_utilities import units, GAS_CONSTANT, SpecInfo, ReacInfo, get_elem_wt
 from . import utils
 
 # Related module
-CANTERA_FLAG = False
 try:
     import cantera as ct
-
     CANTERA_FLAG = True
 except ImportError:
     CANTERA_FLAG = False
@@ -34,18 +26,8 @@ act_energy_units = ['kelvins', 'evolts', 'cal/mole', 'joules/kmole',
                     'kcal/mole', 'joules/mole', 'kjoules/mole'
                     ]
 
-# Activation energy conversion factor
-act_energy_fact = dict({'kelvins': 1.0,
-                        'evolts': 11595.,
-                        'cal/mole': 4.184 / chem.RU_JOUL,
-                        'kcal/mole': 4184. / chem.RU_JOUL,
-                        'joules/mole': 1. / chem.RU_JOUL,
-                        'kjoules/mole': 1000.0 / chem.RU_JOUL,
-                        'joules/kmole': 1. / (chem.RU_JOUL * 1000.)
-                        })
-
 # get local element atomic weight dict
-elem_wt = chem.get_elem_wt()
+elem_wt = get_elem_wt()
 
 
 def read_mech(mech_filename, therm_filename):
@@ -70,8 +52,6 @@ def read_mech(mech_filename, therm_filename):
         List of species in mechanism.
     reacs : list of ReacInfo
         List of reactions in mechanism.
-    units : str
-        Units of reactions' Arrhenius coefficients
 
     """
 
@@ -81,7 +61,6 @@ def read_mech(mech_filename, therm_filename):
     reacs = []
     specs = []
 
-    units = ''
     key = ''
 
     # By default, need to read thermo database if file given.
@@ -135,15 +114,15 @@ def read_mech(mech_filename, therm_filename):
             key = 'reac'
 
             # default units from Chemkin
-            units_E = 'cal/mole'
             units_A = 'moles'
+            units_activation_energy = units.Quantity('cal/mole').units
 
             # get Arrhenius coefficient units (if specified)
             for unit in line.split()[1:]:
                 if unit.lower() in pre_units:
                     units_A = unit.lower()
                 elif unit.lower() in act_energy_units:
-                    units_E = unit.lower()
+                    units_activation_energy = units.Quantity(unit.lower()).units
                 else:
                     print('Error: unsupported units on REACTION line.')
                     print('For pre-exponential factor, choose from: ' +
@@ -192,7 +171,7 @@ def read_mech(mech_filename, therm_filename):
             for s in line_split:
                 if s[0:3] == 'end': continue
                 if not next((sp for sp in specs if sp.name == s), None):
-                    specs.append(chem.SpecInfo(s))
+                    specs.append(SpecInfo(s))
 
         elif key == 'reac':
             # determine if reaction or auxiliary info line
@@ -207,7 +186,7 @@ def read_mech(mech_filename, therm_filename):
                 n = len(line_split)
                 reac_A = float(line_split[n - 3])
                 reac_b = float(line_split[n - 2])
-                reac_E = float(line_split[n - 1])
+                reac_E = float(line_split[n - 1]) * units_activation_energy
 
                 ind = line.index(line_split[n - 3])
                 line = line[0:ind].strip()
@@ -440,7 +419,8 @@ def read_mech(mech_filename, therm_filename):
                     thd = False
 
                 # Convert given activation energy units to internal units
-                reac_E *= act_energy_fact[units_E]
+                if units_activation_energy != units.kelvin:
+                    reac_E = (reac_E / GAS_CONSTANT).to(units.kelvin)
 
                 # Convert given pre-exponential units to internal units
                 if units_A == 'moles':
@@ -456,10 +436,9 @@ def read_mech(mech_filename, therm_filename):
                         reac_A /= 1000. ** (reac_ord - 1.)
 
                 # add reaction to list
-                reac = chem.ReacInfo(reac_rev, reac_spec, reac_nu,
-                                     prod_spec, prod_nu, reac_A, reac_b,
-                                     reac_E
-                                     )
+                reac = ReacInfo(reac_rev, reac_spec, reac_nu,
+                                prod_spec, prod_nu, reac_A, reac_b, reac_E
+                                )
                 reac.thd_body = thd
                 reac.pdep = pdep
                 if pdep: reac.pdep_sp = pdep_sp
@@ -479,10 +458,11 @@ def read_mech(mech_filename, therm_filename):
                     line_split = line.split()
                     par1 = float(line_split[1])
                     par2 = float(line_split[2])
-                    par3 = float(line_split[3])
+                    par3 = float(line_split[3]) * units_activation_energy
 
-                    # Convert reverse activation energy units
-                    par3 *= act_energy_fact[units_E]
+                    # Convert reverse activation energy units to internal units
+                    if units_activation_energy != units.kelvin:
+                        par3 = (par3 / GAS_CONSTANT).to(units.kelvin)
 
                     # Convert reverse pre-exponential factor
                     if units_A == 'moles':
@@ -507,10 +487,11 @@ def read_mech(mech_filename, therm_filename):
                     line_split = line.split()
                     par1 = float(line_split[1])
                     par2 = float(line_split[2])
-                    par3 = float(line_split[3])
+                    par3 = float(line_split[3]) * units_activation_energy
 
                     # Convert low-pressure activation energy units
-                    par3 *= act_energy_fact[units_E]
+                    if units_activation_energy != units.kelvin:
+                        par3 = (par3 / GAS_CONSTANT).to(units.kelvin)
 
                     # Convert low-pressure pre-exponential factor
                     if units_A == 'moles':
@@ -526,10 +507,11 @@ def read_mech(mech_filename, therm_filename):
                     line_split = line.split()
                     par1 = float(line_split[1])
                     par2 = float(line_split[2])
-                    par3 = float(line_split[3])
+                    par3 = float(line_split[3]) * units_activation_energy
 
                     # Convert high-pressure activation energy units
-                    par3 *= act_energy_fact[units_E]
+                    if units_activation_energy != units.kelvin:
+                        par3 = (par3 / GAS_CONSTANT).to(units.kelvin)
 
                     # Convert high-pressure pre-exponential factor
                     if units_A == 'moles':
@@ -595,12 +577,14 @@ def read_mech(mech_filename, therm_filename):
                 elif aux == 'pch':
                     line = line.replace('/', ' ')
                     line_split = line.split()
-                    # Convert pressure from atm to Pa
-                    reacs[-1].cheb_plim = [float(line_split[1]) * chem.PA,
-                                           float(line_split[2]) * chem.PA
-                                           ]
 
-                    # Look for temperature limits on same line:
+                    # low and high pressure limits, given in atm
+                    reacs[-1].cheb_plim = [
+                        float(line_split[1]) * units.atm,
+                        float(line_split[2]) * units.atm
+                        ]
+
+                    # Look for low and high temperature limits on same line
                     if line_split[3].lower() == 'tcheb':
                         reacs[-1].cheb_tlim = [float(line_split[4]),
                                                float(line_split[5])
@@ -613,9 +597,12 @@ def read_mech(mech_filename, therm_filename):
                                            ]
                     # Look for pressure limits on same line:
                     if line_split[3].lower() == 'pcheb':
-                        reacs[-1].cheb_plim = [float(line_split[4]) * chem.PA,
-                                               float(line_split[5]) * chem.PA
-                                               ]
+                        # low and high pressure limits, given in atm
+                        reacs[-1].cheb_plim = [
+                            float(line_split[4]) * units.atm,
+                            float(line_split[5]) * units.atm
+                            ]
+
                 elif aux == 'plo':
                     line = line.replace('/', ' ')
                     line_split = line.split()
@@ -626,12 +613,14 @@ def read_mech(mech_filename, therm_filename):
                         reacs[-1].pdep = False
                         reacs[-1].plog_par = []
                     pars = [float(n) for n in line_split[1:5]]
+                    pars[3] *= units_activation_energy
 
-                    # Convert pressure from atm to Pa
-                    pars[0] *= 101325.0
+                    # pressure given in atm
+                    pars[0] *= units.atm
 
                     # Convert given activation energy units to internal units
-                    pars[3] *= act_energy_fact[units_E]
+                    if units_activation_energy != units.kelvin:
+                        pars[3] = (pars[3] / GAS_CONSTANT).to(units.kelvin)
 
                     # Convert given pre-exponential units to internal units
                     if units_A == 'moles':
@@ -665,7 +654,7 @@ def read_mech(mech_filename, therm_filename):
                 # Convert units of first Chebyshev parameter
                 order = sum(reac.reac_nu)
                 if units_A == 'moles':
-                    reac.cheb_par[0] += math.log10(0.001 ** (order - 1.))
+                    reac.cheb_par[0] += np.log10(0.001 ** (order - 1.))
 
                 reacs[idx].cheb_par = np.reshape(reac.cheb_par, (n, m))
 
@@ -877,7 +866,7 @@ def read_mech_ct(filename=None, gas=None):
     # Species
     specs = []
     for i, sp in enumerate(gas.species_names):
-        spec = chem.SpecInfo(sp)
+        spec = SpecInfo(sp)
 
         spec.mw = gas.molecular_weights[i]
 
@@ -906,35 +895,39 @@ def read_mech_ct(filename=None, gas=None):
     reacs = []
 
     # Cantera internally uses joules/kmol for activation energy
-    E_fac = act_energy_fact['joules/kmole']
+    units_activation_energy = units('joules/kmole')
 
     for rxn in gas.reactions():
 
         if isinstance(rxn, ct.ThreeBodyReaction):
+            activation_energy = rxn.rate.activation_energy * units_activation_energy
             # Instantiate internal reaction based on Cantera Reaction data.
-            reac = chem.ReacInfo(rxn.reversible,
-                                 rxn.reactants.keys(),
-                                 rxn.reactants.values(),
-                                 rxn.products.keys(),
-                                 rxn.products.values(),
-                                 rxn.rate.pre_exponential_factor,
-                                 rxn.rate.temperature_exponent,
-                                 rxn.rate.activation_energy * E_fac
-                                 )
+            reac = ReacInfo(
+                rxn.reversible,
+                rxn.reactants.keys(),
+                rxn.reactants.values(),
+                rxn.products.keys(),
+                rxn.products.values(),
+                rxn.rate.pre_exponential_factor,
+                rxn.rate.temperature_exponent,
+                (activation_energy / GAS_CONSTANT).to(units.kelvin)
+                )
             reac.thd_body = True
             for thd_body in rxn.efficiencies:
                 reac.thd_body_eff.append([thd_body, rxn.efficiencies[thd_body]])
 
         elif isinstance(rxn, ct.FalloffReaction):
-            reac = chem.ReacInfo(rxn.reversible,
-                                 rxn.reactants.keys(),
-                                 rxn.reactants.values(),
-                                 rxn.products.keys(),
-                                 rxn.products.values(),
-                                 rxn.high_rate.pre_exponential_factor,
-                                 rxn.high_rate.temperature_exponent,
-                                 rxn.high_rate.activation_energy * E_fac
-                                 )
+            activation_energy = rxn.high_rate.activation_energy * units_activation_energy
+            reac = ReacInfo(
+                rxn.reversible,
+                rxn.reactants.keys(),
+                rxn.reactants.values(),
+                rxn.products.keys(),
+                rxn.products.values(),
+                rxn.high_rate.pre_exponential_factor,
+                rxn.high_rate.temperature_exponent,
+                (activation_energy / GAS_CONSTANT).to(units.kelvin)
+                )
             reac.pdep = True
             # See if single species acts as third body
             if rxn.default_efficiency == 0.0:
@@ -943,9 +936,10 @@ def read_mech_ct(filename=None, gas=None):
                 for sp in rxn.efficiencies:
                     reac.thd_body_eff.append([sp, rxn.efficiencies[sp]])
 
+            activation_energy = rxn.low_rate.activation_energy * units_activation_energy
             reac.low = [rxn.low_rate.pre_exponential_factor,
                         rxn.low_rate.temperature_exponent,
-                        rxn.low_rate.activation_energy * E_fac
+                        (activation_energy / GAS_CONSTANT).to(units.kelvin)
                         ]
 
             if rxn.falloff.type == 'Troe':
@@ -956,15 +950,17 @@ def read_mech_ct(filename=None, gas=None):
                 reac.sri_par = rxn.falloff.parameters.tolist()
 
         elif isinstance(rxn, ct.ChemicallyActivatedReaction):
-            reac = chem.ReacInfo(rxn.reversible,
-                                 rxn.reactants.keys(),
-                                 rxn.reactants.values(),
-                                 rxn.products.keys(),
-                                 rxn.products.values(),
-                                 rxn.low_rate.pre_exponential_factor,
-                                 rxn.low_rate.temperature_exponent,
-                                 rxn.low_rate.activation_energy * E_fac
-                                 )
+            activation_energy = rxn.low_rate.activation_energy * units_activation_energy
+            reac = ReacInfo(
+                rxn.reversible,
+                rxn.reactants.keys(),
+                rxn.reactants.values(),
+                rxn.products.keys(),
+                rxn.products.values(),
+                rxn.low_rate.pre_exponential_factor,
+                rxn.low_rate.temperature_exponent,
+                (activation_energy / GAS_CONSTANT).to(units.kelvin)
+                )
             reac.pdep = True
             # See if single species acts as third body
             if rxn.default_efficiency == 0.0:
@@ -973,9 +969,10 @@ def read_mech_ct(filename=None, gas=None):
                 for sp in rxn.efficiencies:
                     reac.thd_body_eff.append([sp, rxn.efficiencies[sp]])
 
+            activation_energy = rxn.high_rate.activation_energy * units_activation_energy
             reac.high = [rxn.high_rate.pre_exponential_factor,
                          rxn.high_rate.temperature_exponent,
-                         rxn.high_rate.activation_energy * E_fac
+                         (activation_energy / GAS_CONSTANT).to(units.kelvin)
                          ]
 
             if rxn.falloff.type == 'Troe':
@@ -986,48 +983,54 @@ def read_mech_ct(filename=None, gas=None):
                 reac.sri_par = rxn.falloff.parameters.tolist()
 
         elif isinstance(rxn, ct.PlogReaction):
-            reac = chem.ReacInfo(rxn.reversible,
-                                 rxn.reactants.keys(),
-                                 rxn.reactants.values(),
-                                 rxn.products.keys(),
-                                 rxn.products.values(),
-                                 0.0, 0.0, 0.0
-                                 )
+            reac = ReacInfo(
+                rxn.reversible,
+                rxn.reactants.keys(),
+                rxn.reactants.values(),
+                rxn.products.keys(),
+                rxn.products.values(),
+                0.0, 0.0, 0.0
+                )
             reac.plog = True
             reac.plog_par = []
             for rate in rxn.rates:
-                pars = [rate[0], rate[1].pre_exponential_factor,
+                activation_energy = rate[1].activation_energy * units_activation_energy
+                pars = [rate[0] * units.pascal, 
+                        rate[1].pre_exponential_factor,
                         rate[1].temperature_exponent,
-                        rate[1].activation_energy * E_fac
+                        (activation_energy / GAS_CONSTANT).to(units.kelvin)
                         ]
                 reac.plog_par.append(pars)
 
         elif isinstance(rxn, ct.ChebyshevReaction):
-            reac = chem.ReacInfo(rxn.reversible,
-                                 rxn.reactants.keys(),
-                                 rxn.reactants.values(),
-                                 rxn.products.keys(),
-                                 rxn.products.values(),
-                                 0.0, 0.0, 0.0
-                                 )
+            reac = ReacInfo(
+                rxn.reversible,
+                rxn.reactants.keys(),
+                rxn.reactants.values(),
+                rxn.products.keys(),
+                rxn.products.values(),
+                0.0, 0.0, 0.0
+                )
             reac.cheb = True
             reac.cheb_n_temp = rxn.nTemperature
             reac.cheb_n_pres = rxn.nPressure
-            reac.cheb_plim = [rxn.Pmin, rxn.Pmax]
+            reac.cheb_plim = [rxn.Pmin * units.pascal, rxn.Pmax * units.pascal]
             reac.cheb_tlim = [rxn.Tmin, rxn.Tmax]
             reac.cheb_par = rxn.coeffs
 
         elif isinstance(rxn, ct.ElementaryReaction):
             # Instantiate internal reaction based on Cantera Reaction data.
-            reac = chem.ReacInfo(rxn.reversible,
-                                 rxn.reactants.keys(),
-                                 rxn.reactants.values(),
-                                 rxn.products.keys(),
-                                 rxn.products.values(),
-                                 rxn.rate.pre_exponential_factor,
-                                 rxn.rate.temperature_exponent,
-                                 rxn.rate.activation_energy * E_fac
-                                 )
+            activation_energy = rxn.activation_energy * units_activation_energy
+            reac = ReacInfo(
+                rxn.reversible,
+                rxn.reactants.keys(),
+                rxn.reactants.values(),
+                rxn.products.keys(),
+                rxn.products.values(),
+                rxn.rate.pre_exponential_factor,
+                rxn.rate.temperature_exponent,
+                (activation_energy / GAS_CONSTANT).to(units.kelvin)
+                )
 
         else:
             print('Error: unsupported reaction.')
