@@ -41,6 +41,14 @@ def mech_util(argv):
         action='store_true',
         default=False,
         )
+    
+    parser.add_argument(
+        '--method',
+        help='Method for removing PLOG reactions (interpolate, or use nearest)',
+        choices=['interpolate', 'nearest'],
+        type=str,
+        default='interpolate',
+        )
 
     parser.add_argument(
         '--pressure',
@@ -105,5 +113,5 @@ def mech_util(argv):
     
     if args.remove_plog:
         remove_plog_reactions(
-            args.model, args.thermo, args.pressure, args.output
+            args.model, args.thermo, args.pressure, args.output, args.method
             )

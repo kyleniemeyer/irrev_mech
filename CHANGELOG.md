@@ -6,10 +6,13 @@ and this project adheres to [Semantic Versioning](http://semver.org/).
 
 ## [Unreleased]
 ### Added
+- Added module for de-plogging reactions in a model
 
 ### Fixed
 
 ### Changed
+- Changed package name to "mech_util" to reflect broader capabilities
+- Moved write_mech function to separate module
 - Removed claim of Python 2.x compatibility
 
 

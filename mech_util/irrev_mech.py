@@ -4,6 +4,7 @@
 # Standard libraries
 import copy
 import warnings
+import logging
 from multiprocessing import Pool
 from itertools import repeat
 
@@ -86,13 +87,13 @@ def calc_rev_Arrhenius(specs, rxn, rxn_id, Tfit, coeffs):
 
     A = coeffs[0]
     b = coeffs[1]
-    E = coeffs[2].to(units.kelvin).magnitude
+    E = coeffs[2]
 
     x1 = np.log(T1)
     x2 = np.log(T2)
     x3 = np.log(T3)
 
-    p_Arr = A, b, E
+    p_Arr = A, b, E.to(units.kelvin).magnitude
 
     # calculate reverse reaction rates for each temperature
 
@@ -137,11 +138,12 @@ def calc_rev_Arrhenius(specs, rxn, rxn_id, Tfit, coeffs):
         except RuntimeWarning:
             continue
     else:
-        print('Warning: minimization failed to converge for reaction ' +
+        logging.info('Warning: minimization failed to converge for reaction ' +
               str(rxn_id) + '.'
               )
 
-    return val_lsq[0]
+    parameters = val_lsq[0]
+    return [parameters[0], parameters[1], parameters[2] * units.kelvin]
 
 
 def process_reaction(arg):
@@ -186,7 +188,7 @@ def process_reaction(arg):
             coeffs = rxn.low
         elif rxn.high:
             coeffs = rxn.high
-
+        
         rev_par = calc_rev_Arrhenius(specs, rxn, idx, Tfit, coeffs)
 
         if rxn.low:

@@ -53,4 +53,4 @@ def test_convert_mech_irrev():
         with open(output_file, 'r') as f:
             output = f.read()
 
-    #assert output == blessed
+    assert output == blessed
