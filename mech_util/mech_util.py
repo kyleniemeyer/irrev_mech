@@ -54,6 +54,7 @@ def mech_util(argv):
         '--pressure',
         help='Specifies pressure for removal of PLOG reactions',
         type=str,
+        nargs='+',
         default='1.0 atm',
         )
 
@@ -112,6 +113,8 @@ def mech_util(argv):
             )
     
     if args.remove_plog:
+        pressure = ' '.join(args.pressure)
         remove_plog_reactions(
-            args.model, args.thermo, args.pressure, args.output, args.method
+            args.model, args.thermo, pressure=pressure, 
+            output_file=args.output, method=args.method
             )

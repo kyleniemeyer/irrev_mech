@@ -8,7 +8,7 @@ import re
 import numpy as np
 
 # Local imports
-from .chem_utilities import units, GAS_CONSTANT, SpecInfo, ReacInfo, get_elem_wt
+from .chem_utilities import units, GAS_CONSTANT, SpecInfo, ReacInfo, get_elem_wt, Arrhenius
 from . import utils
 
 # Related module
@@ -437,7 +437,8 @@ def read_mech(mech_filename, therm_filename):
 
                 # add reaction to list
                 reac = ReacInfo(reac_rev, reac_spec, reac_nu,
-                                prod_spec, prod_nu, reac_A, reac_b, reac_E
+                                prod_spec, prod_nu, 
+                                reac_A, reac_b, reac_E
                                 )
                 reac.thd_body = thd
                 reac.pdep = pdep
@@ -477,9 +478,7 @@ def read_mech(mech_filename, therm_filename):
                             # Elementary reaction
                             par1 /= 1000. ** (reac_ord - 1.)
 
-                    reacs[-1].rev_par.append(par1)
-                    reacs[-1].rev_par.append(par2)
-                    reacs[-1].rev_par.append(par3)
+                    reacs[-1].rev_par = Arrhenius(par1, par2, par3)
 
                 elif aux == 'low':
                     line = line.replace('/', ' ')
@@ -497,9 +496,7 @@ def read_mech(mech_filename, therm_filename):
                     if units_A == 'moles':
                         par1 /= 1000. ** sum(reacs[-1].reac_nu)
 
-                    reacs[-1].low.append(par1)
-                    reacs[-1].low.append(par2)
-                    reacs[-1].low.append(par3)
+                    reacs[-1].low = Arrhenius(par1, par2, par3)
 
                 elif aux == 'hig':
                     line = line.replace('/', ' ')
@@ -517,9 +514,7 @@ def read_mech(mech_filename, therm_filename):
                     if units_A == 'moles':
                         par1 /= 1000. ** (sum(reacs[-1].reac_nu) - 2.)
 
-                    reacs[-1].high.append(par1)
-                    reacs[-1].high.append(par2)
-                    reacs[-1].high.append(par3)
+                    reacs[-1].high = Arrhenius(par1, par2, par3)
 
                 elif aux == 'tro':
                     line = line.replace('/', ' ')
@@ -611,12 +606,12 @@ def read_mech(mech_filename, therm_filename):
                         # Don't want Plog reactions lumped in with
                         # standard falloff.
                         reacs[-1].pdep = False
-                        reacs[-1].plog_par = []
                     pars = [float(n) for n in line_split[1:5]]
+                    pressure = pars[0]
                     pars[3] *= units_activation_energy
 
                     # pressure given in atm
-                    pars[0] *= units.atm
+                    pressure *= units.atm
 
                     # Convert given activation energy units to internal units
                     if units_activation_energy != units.kelvin:
@@ -628,7 +623,9 @@ def read_mech(mech_filename, therm_filename):
                         # Looks like elementary reaction
                         pars[1] /= 1000. ** (reac_ord - 1.)
 
-                    reacs[-1].plog_par.append(pars)
+                    reacs[-1].plog_par.append([
+                        pressure, Arrhenius(pars[1], pars[2], pars[3])
+                        ])
                 else:
                     # enhanced third body efficiencies
                     line = line.replace('/', ' ')
@@ -701,10 +698,12 @@ def read_thermo(filename, elems, specs):
             line = file.readline()
 
             # skip blank or commented lines
-            if re.search('^\s*$', line) or re.search('^\s*!', line): continue
+            if re.search('^\s*$', line) or re.search('^\s*!', line): 
+                continue
 
             # skip 'thermo' at beginning
-            if 'thermo' in line.lower(): break
+            if 'thermo' in line.lower(): 
+                break
 
         # next line either has common temperature ranges or first species
         last_line = file.tell()
@@ -937,10 +936,11 @@ def read_mech_ct(filename=None, gas=None):
                     reac.thd_body_eff.append([sp, rxn.efficiencies[sp]])
 
             activation_energy = rxn.low_rate.activation_energy * units_activation_energy
-            reac.low = [rxn.low_rate.pre_exponential_factor,
-                        rxn.low_rate.temperature_exponent,
-                        (activation_energy / GAS_CONSTANT).to(units.kelvin)
-                        ]
+            reac.low = Arrhenius(
+                rxn.low_rate.pre_exponential_factor,
+                rxn.low_rate.temperature_exponent,
+                (activation_energy / GAS_CONSTANT).to(units.kelvin)
+                )
 
             if rxn.falloff.type == 'Troe':
                 reac.troe = True
@@ -970,10 +970,11 @@ def read_mech_ct(filename=None, gas=None):
                     reac.thd_body_eff.append([sp, rxn.efficiencies[sp]])
 
             activation_energy = rxn.high_rate.activation_energy * units_activation_energy
-            reac.high = [rxn.high_rate.pre_exponential_factor,
-                         rxn.high_rate.temperature_exponent,
-                         (activation_energy / GAS_CONSTANT).to(units.kelvin)
-                         ]
+            reac.high = Arrhenius(
+                rxn.high_rate.pre_exponential_factor,
+                rxn.high_rate.temperature_exponent,
+                (activation_energy / GAS_CONSTANT).to(units.kelvin)
+                )
 
             if rxn.falloff.type == 'Troe':
                 reac.troe = True
@@ -992,15 +993,13 @@ def read_mech_ct(filename=None, gas=None):
                 0.0, 0.0, 0.0
                 )
             reac.plog = True
-            reac.plog_par = []
             for rate in rxn.rates:
                 activation_energy = rate[1].activation_energy * units_activation_energy
-                pars = [rate[0] * units.pascal, 
-                        rate[1].pre_exponential_factor,
-                        rate[1].temperature_exponent,
-                        (activation_energy / GAS_CONSTANT).to(units.kelvin)
-                        ]
-                reac.plog_par.append(pars)
+                reac.plog_par.append([rate[0] * units.pascal, Arrhenius(
+                    rate[1].pre_exponential_factor,
+                    rate[1].temperature_exponent,
+                    (activation_energy / GAS_CONSTANT).to(units.kelvin)
+                    )])
 
         elif isinstance(rxn, ct.ChebyshevReaction):
             reac = ReacInfo(

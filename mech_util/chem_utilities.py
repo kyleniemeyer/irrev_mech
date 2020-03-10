@@ -1,12 +1,13 @@
 """Module containing element dict, species and reaction classes, and constants.
 
 """
+from typing import NamedTuple
 
 import numpy as np
 import pint
 
 __all__ = ['get_elem_wt', 'units', 'Q_', 'AVAG', 'GAS_CONSTANT',
-           'ReacInfo', 'SpecInfo', 'calc_spec_smh']
+           'ReacInfo', 'SpecInfo', 'calc_spec_smh', 'Arrhenius']
 
 # universal gas constants, SI units
 #RU = 8314.4621  # J/(kmole * K)
@@ -29,6 +30,14 @@ Q_ = units.Quantity
 
 GAS_CONSTANT = Q_(8314.4621, 'joule/(kmole*kelvin)')
 
+
+class Arrhenius(NamedTuple):
+    """Holds Arrhenius factors.
+    """
+    pre_factor: float
+    temp_exponent: float
+    act_energy: units.Quantity
+    
 
 class CommonEqualityMixin(object):
     def __eq__(self, other):
@@ -117,14 +126,10 @@ class ReacInfo(CommonEqualityMixin):
         List of product species names.
     prod_nu : list of int/float
         List of product stoichiometric coefficients, either int or float.
-    A : float
-        Arrhenius pre-exponential coefficient.
-    b : float
-        Arrhenius temperature exponent.
-    E : float
-        Arrhenius activation energy.
-    rev_par : list of float, optional
-        List of reverse Arrhenius coefficients (default empty).
+    rate_parameters : Arrhenius
+        Arrhenius rate coefficient parameters.s
+    rev_par : Arrhenius, optional
+        Explicit reverse Arrhenius coefficients (default empty).
     dup : bool, optional
         Duplicate reaction flag (default False).
     thd : bool, optional
@@ -135,10 +140,10 @@ class ReacInfo(CommonEqualityMixin):
         Pressure-dependence flag (default False).
     pdep_sp : str, optional
         Name of specific third-body or 'M' (default '').
-    low : list of float, optional
-        List of low-pressure-limit Arrhenius coefficients (default empty).
-    high : list of float, optional
-        List of high-pressure-limit Arrhenius coefficients (default empty).
+    low : Arrhenius, optional
+        Low-pressure-limit Arrhenius coefficients (default empty).
+    high : Arrhenius, optional
+        High-pressure-limit Arrhenius coefficients (default empty).
     troe : bool, optional
         Troe pressure-dependence formulation flag (default False).
     troe_par : list of float, optional
@@ -165,15 +170,13 @@ class ReacInfo(CommonEqualityMixin):
 
         # Arrhenius coefficients
         # pre-exponential factor [m, kmol, s]
-        self.A = A
         # Temperature exponent [-]
-        self.b = b
         # Activation energy, stored as activation temperature [K]
-        self.E = E
+        self.rate_parameters = Arrhenius(A, b, E)
 
         # reversible reaction properties
         self.rev = rev      # reaction is reversible
-        self.rev_par = []   # explicit reverse A, b, E
+        self.rev_par = None   # explicit reverse A, b, E
 
         # duplicate reaction
         self.dup = False
@@ -185,8 +188,8 @@ class ReacInfo(CommonEqualityMixin):
         # pressure dependence
         self.pdep = False
         self.pdep_sp = ''
-        self.low = []
-        self.high = []
+        self.low = None
+        self.high = None
 
         self.troe = False
         self.troe_par = []
@@ -215,8 +218,8 @@ class ReacInfo(CommonEqualityMixin):
         # logarithmically interpolating between Arrhenius rate expressions at
         # various pressures.
         self.plog = False
-        # List of arrays with [pressure [Pa], A, b, E]
-        self.plog_par = None
+        # List of pressure and Arrhenius objects with [pressure [Pa], A, b, E]
+        self.plog_par = []
 
 
 class SpecInfo(CommonEqualityMixin):

@@ -96,20 +96,22 @@ def write_mech(filename, elems, specs, reacs):
 
             # Convert internal units to moles
             reac_ord = sum(rxn.reac_nu)
+            pre_factor = rxn.rate_parameters.pre_factor
             if rxn.thd_body:
-                rxn.A *= 1000. ** reac_ord
+                pre_factor *= 1000. ** reac_ord
             elif rxn.pdep:
                 # Low- (chemically activated bimolecular reaction) or
                 # high-pressure (fall-off reaction) limit parameters
-                rxn.A *= 1000. ** (reac_ord - 1.)
+                pre_factor *= 1000. ** (reac_ord - 1.)
             else:
                 # Elementary reaction
-                rxn.A *= 1000. ** (reac_ord - 1.)
+                pre_factor *= 1000. ** (reac_ord - 1.)
 
             # now add Arrhenius coefficients to the same line
             line += ' {:.4e} {:.4e} {:.4e}'.format(
-                rxn.A, rxn.b, 
-                (rxn.E * GAS_CONSTANT).to(units('cal/mole')).magnitude
+                pre_factor, 
+                rxn.rate_parameters.temp_exponent, 
+                (rxn.rate_parameters.act_energy * GAS_CONSTANT).to(units('cal/mole')).magnitude
                 )
 
             line += '\n'
@@ -119,36 +121,37 @@ def write_mech(filename, elems, specs, reacs):
             if rxn.rev and rxn.rev_par:
                 # Convert internal units to moles
                 reac_ord = sum(rxn.prod_nu)
+                pre_factor = rxn.rev_par.pre_factor
                 if rxn.thd_body:
-                    rxn.rev_par[0] *= 1000. ** reac_ord
+                    pre_factor *= 1000. ** reac_ord
                 elif rxn.pdep:
                     # Low- (chemically activated bimolecular reaction) or
                     # high-pressure (fall-off reaction) limit parameters
-                    rxn.rev_par[0] *= 1000. ** (reac_ord - 1.)
+                    pre_factor *= 1000. ** (reac_ord - 1.)
                 else:
                     # Elementary reaction
-                    rxn.rev_par[0] *= 1000. ** (reac_ord - 1.)
+                    pre_factor *= 1000. ** (reac_ord - 1.)
 
                 line = '  rev/ {:.4e}  {:.4e}  {:.4e} /\n'.format(
-                    rxn.rev_par[0],
-                    rxn.rev_par[1],
-                    (rxn.rev_par[2] * GAS_CONSTANT).to(units('cal/mole')).magnitude
+                    pre_factor,
+                    rxn.rev_par.temp_exponent,
+                    (rxn.rev_par.act_energy * GAS_CONSTANT).to(units('cal/mole')).magnitude
                     )
                 file.write(line)
 
             # write Lindemann low- or high-pressure limit Arrhenius parameters
             if rxn.pdep:
-                if len(rxn.low) > 0:
-                    rxn.low[0] *= 1000. ** sum(rxn.reac_nu)
+                if rxn.low:
                     line = '  low /{:.4e}  {:.4e}  {:.4e} /\n'.format(
-                        rxn.low[0], rxn.low[1], 
-                        (rxn.low[2] * GAS_CONSTANT).to(units('cal/mole')).magnitude
+                        rxn.low.pre_factor * 1000. ** sum(rxn.reac_nu), 
+                        rxn.low.temp_exponent, 
+                        (rxn.low.act_energy * GAS_CONSTANT).to(units('cal/mole')).magnitude
                         )
                 else:
-                    rxn.high[0] *= 1000. ** (sum(rxn.reac_nu) - 2.)
                     line = '  high /{:.4e}  {:.4e}  {:.4e} /\n'.format(
-                        rxn.high[0], rxn.high[1], 
-                        (rxn.high[2] * GAS_CONSTANT).to(units('cal/mole')).magnitude
+                        rxn.high.pre_factor * 1000. ** (sum(rxn.reac_nu) - 2.), 
+                        rxn.high.temp_exponent, 
+                        (rxn.high.act_energy * GAS_CONSTANT).to(units('cal/mole')).magnitude
                         )
                 file.write(line)
 
@@ -200,14 +203,12 @@ def write_mech(filename, elems, specs, reacs):
             # write PLOG parameters, if any
             if rxn.plog:
                 for par in rxn.plog_par:
-                    # convert to appropriate units
-                    par[0] = par[0].to('atm').magnitude
-                    par[1] *= 1000. ** (sum(rxn.reac_nu) - 1.)
-
                     line = (
-                        '  plog/ {:.2e} {:.4e} '.format(par[0], par[1]) +
-                        '{:.4e} {:.4e} /\n'.format(par[2],
-                            (par[3] * GAS_CONSTANT).to(units('cal/mole')).magnitude
+                        '  plog/ {:.2e} '.format(par[0].to('atm').magnitude) +
+                        '{:.4e} {:.4e} {:.4e} /\n'.format(
+                            par[1].pre_factor * 1000. ** (sum(rxn.reac_nu) - 1.),
+                            par[1].temp_exponent,
+                            (par[1].act_energy * GAS_CONSTANT).to(units('cal/mole')).magnitude
                             )
                         )
                     file.write(line)
