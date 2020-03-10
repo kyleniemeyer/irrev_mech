@@ -291,7 +291,7 @@ def convert_plog(rxn, pressure, method='interpolate'):
 
 def remove_plog_reactions(
     mech_name, therm_name=None, pressure='1.0 atm', output_file='mech.out',
-    method='interpolate'
+    method='nearest'
     ):
     """Remove PLOG reactions from Chemkin-style model based on desired pressure.
 

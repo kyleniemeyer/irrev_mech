@@ -47,7 +47,7 @@ def mech_util(argv):
         help='Method for removing PLOG reactions (interpolate, or use nearest)',
         choices=['interpolate', 'nearest'],
         type=str,
-        default='interpolate',
+        default='nearest',
         )
 
     parser.add_argument(
